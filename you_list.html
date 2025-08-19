@@ -676,9 +676,10 @@
             const isEmptyKeyword = !keyword || !keyword.trim();
             
             console.log('=== 클라이언트 검색 요청 디버그 ===');
-            console.log('선택된 국가:', country);
-            console.log('입력된 키워드:', keyword || '없음');
-            console.log('검색 파라미터:', searchParams.toString());
+            console.log('🏳️ 선택된 국가:', country);
+            console.log('🔍 입력된 키워드:', keyword || '없음');
+            console.log('📋 검색 파라미터:', searchParams.toString());
+            console.log('🌍 검색 범위:', country === 'worldwide' ? '전세계' : `${country} 국가별`);
             console.log('===========================');
             
             if (isEmptyKeyword) {

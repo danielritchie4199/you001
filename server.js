@@ -163,16 +163,24 @@ app.get('/api/search', async (req, res) => {
       const regionCode = getCountryCode(country);
       if (regionCode) {
         searchParams.regionCode = regionCode;
-        console.log(`지역 코드 설정: ${country} → ${regionCode}`);
+        console.log(`✅ 지역 코드 설정: ${country} → ${regionCode}`);
       } else {
-        console.log(`경고: '${country}' 국가의 regionCode를 찾을 수 없어 전세계 검색으로 진행합니다.`);
+        console.log(`⚠️ 경고: '${country}' 국가의 regionCode를 찾을 수 없어 전세계 검색으로 진행합니다.`);
+        // regionCode가 null인 경우 명시적으로 제거
+        delete searchParams.regionCode;
       }
     } else {
-      console.log('전세계 검색: regionCode 없이 진행');
+      console.log('🌍 전세계 검색: regionCode 없이 진행');
+      // 전세계 검색 시 regionCode 명시적으로 제거
+      delete searchParams.regionCode;
     }
 
     // 언어 설정 (국가별 기본 언어)
-    searchParams.relevanceLanguage = getLanguageCode(country);
+    const languageCode = getLanguageCode(country);
+    if (languageCode) {
+      searchParams.relevanceLanguage = languageCode;
+      console.log(`🌐 언어 설정: ${country} → ${languageCode}`);
+    }
 
     console.log('=== 국가별 검색 디버그 정보 ===');
     console.log('1. 클라이언트 요청 country:', country);
