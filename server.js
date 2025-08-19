@@ -186,15 +186,18 @@ app.get('/api/search', async (req, res) => {
     console.log('1. 클라이언트 요청 country:', country);
     console.log('2. getCountryCode 결과:', getCountryCode(country));
     console.log('3. getLanguageCode 결과:', getLanguageCode(country));
-    console.log('4. 최종 YouTube API 검색 파라미터:', {
+    console.log('4. 키워드 상태:', keyword ? `"${keyword}"` : '없음 (국가별 인기 검색)');
+    console.log('5. 검색 전략:', keyword ? '키워드 기반 검색' : (country === 'worldwide' ? '전세계 인기 검색' : `${country} 국가별 인기 검색`));
+    console.log('6. 최종 YouTube API 검색 파라미터:', {
       regionCode: searchParams.regionCode || '없음 (전세계 검색)',
       relevanceLanguage: searchParams.relevanceLanguage,
       country: country,
-      keyword: keyword || '키워드 없음',
+      keyword: searchParams.q || '키워드 없음',
       order: searchParams.order,
       type: searchParams.type,
       isWorldwide: country === 'worldwide'
     });
+    console.log('7. 검색 타입:', country === 'worldwide' ? '🌍 전세계 검색' : `🏳️ ${country} 국가별 검색`);
     console.log('===========================');
 
     // 키워드 설정
@@ -204,20 +207,53 @@ app.get('/api/search', async (req, res) => {
       searchParams.q = keyword.trim();
       console.log(`키워드 검색: "${keyword.trim()}"`);
     } else {
-      // 키워드가 없을 때는 조회수가 높은 인기 동영상 검색
-      console.log('키워드 없음: 인기 동영상 검색 (조회수 높은 순)');
+      // 키워드가 없을 때는 국가별 인기 동영상 검색
+      console.log('키워드 없음: 국가별 인기 동영상 검색');
       
-      // YouTube API에서 키워드 없이 검색하기 위해 매우 일반적인 단어들 사용
-      // 이렇게 하면 거의 모든 동영상이 매칭되어 조회수 순으로 정렬됨
-      const broadSearchTerms = ['a', 'the', 'and', 'or', 'video', 'youtube'];
-      const randomTerm = broadSearchTerms[Math.floor(Math.random() * broadSearchTerms.length)];
-      searchParams.q = randomTerm;
-      
-      // 조회수 정렬을 확실히 설정
-      searchParams.order = 'viewCount';
-      
-      console.log(`인기 동영상 검색용 광범위 검색어: "${randomTerm}"`);
-      console.log('설정: 조회수 높은 순서로 정렬');
+      if (country !== 'worldwide') {
+        // 특정 국가 선택 시: 해당 국가의 인기 콘텐츠 검색
+        console.log(`🏳️ ${country} 국가의 인기 동영상 검색`);
+        
+        // 국가별 인기 검색어 사용 (더 정확한 지역별 결과)
+        const countrySpecificTerms = {
+          'korea': ['한국', 'korean', 'korea', '한국어'],
+          'usa': ['america', 'usa', 'american', 'english'],
+          'japan': ['japan', 'japanese', '일본', '일본어'],
+          'uk': ['britain', 'uk', 'british', 'english'],
+          'germany': ['germany', 'german', 'deutsch', '독일'],
+          'france': ['france', 'french', 'français', '프랑스'],
+          'canada': ['canada', 'canadian', 'english', 'french'],
+          'australia': ['australia', 'australian', 'english'],
+          'india': ['india', 'indian', 'hindi', 'english'],
+          'brazil': ['brazil', 'brazilian', 'portuguese', 'português'],
+          'mexico': ['mexico', 'mexican', 'spanish', 'español'],
+          'italy': ['italy', 'italian', 'italiano', '이탈리아'],
+          'spain': ['spain', 'spanish', 'español', '스페인']
+        };
+        
+        const terms = countrySpecificTerms[country] || ['video', 'popular'];
+        const randomTerm = terms[Math.floor(Math.random() * terms.length)];
+        searchParams.q = randomTerm;
+        
+        // 국가별 검색을 위해 order를 relevance로 설정 (regionCode와 relevanceLanguage가 우선 적용됨)
+        searchParams.order = 'relevance';
+        
+        console.log(`🌍 ${country} 국가별 인기 검색어: "${randomTerm}"`);
+        console.log('설정: 관련성 순서로 정렬 (국가별 우선)');
+      } else {
+        // 전세계 선택 시: 일반적인 인기 동영상 검색
+        console.log('🌍 전세계 인기 동영상 검색');
+        
+        const broadSearchTerms = ['a', 'the', 'and', 'or', 'video', 'youtube'];
+        const randomTerm = broadSearchTerms[Math.floor(Math.random() * broadSearchTerms.length)];
+        searchParams.q = randomTerm;
+        
+        // 전세계 검색 시에만 조회수 순 정렬
+        searchParams.order = 'viewCount';
+        
+        console.log(`전세계 인기 동영상 검색어: "${randomTerm}"`);
+        console.log('설정: 조회수 높은 순서로 정렬');
+      }
     }
 
     // 업로드 기간 설정
@@ -230,19 +266,22 @@ app.get('/api/search', async (req, res) => {
     // 동영상 길이 설정 (YouTube API는 'short', 'medium', 'long'만 지원하므로 후처리에서 필터링)
     // videoLength 파라미터는 클라이언트에서 받아서 결과 필터링에 사용
 
-    // 선택한 수만큼 결과 수집
-    while (searchResults.length < finalMaxResults) {
-      if (nextPageToken) {
-        searchParams.pageToken = nextPageToken;
-      }
+         // 선택한 수만큼 결과 수집 (중복 제거)
+     const processedVideoIds = new Set(); // 이미 처리된 비디오 ID 추적
+     const processedChannelTitles = new Set(); // 이미 처리된 채널명 추적 (선택적)
+     
+     while (searchResults.length < finalMaxResults) {
+       if (nextPageToken) {
+         searchParams.pageToken = nextPageToken;
+       }
 
-      let response;
-      let currentApiKey = apiKeyManager.getCurrentKey();
-      
-      try {
-        const youtube = apiKeyManager.getYouTubeInstance();
-        response = await youtube.search.list(searchParams);
-      } catch (apiError) {
+       let response;
+       let currentApiKey = apiKeyManager.getCurrentKey();
+       
+       try {
+         const youtube = apiKeyManager.getYouTubeInstance();
+         response = await youtube.search.list(searchParams);
+       } catch (apiError) {
         console.error('YouTube API 오류:', apiError.message);
         
         // 할당량 초과 오류 처리
@@ -365,41 +404,49 @@ app.get('/api/search', async (req, res) => {
         }
       }
 
-      // 검색 결과 처리
-      for (const video of videoDetails.data.items) {
-        const viewCount = parseInt(video.statistics.viewCount || 0);
-        
-        // 조회수 필터링
-        if (minViews && viewCount < parseInt(minViews)) continue;
-        if (maxViews && viewCount > parseInt(maxViews)) continue;
+             // 검색 결과 처리 (중복 제거)
+       for (const video of videoDetails.data.items) {
+         // 중복 비디오 ID 체크
+         if (processedVideoIds.has(video.id)) {
+           console.log(`🔄 중복 동영상 건너뛰기: ${video.id} - ${video.snippet.title}`);
+           continue;
+         }
+         
+         const viewCount = parseInt(video.statistics.viewCount || 0);
+         
+         // 조회수 필터링
+         if (minViews && viewCount < parseInt(minViews)) continue;
+         if (maxViews && viewCount > parseInt(maxViews)) continue;
 
-        // 동영상 길이 필터링
-        const durationInSeconds = parseDuration(video.contentDetails.duration);
-        const videoLengthCategory = getVideoLengthCategory(durationInSeconds);
-        
-        if (!matchesVideoLength(videoLengthCategory, selectedVideoLengths)) continue;
+         // 동영상 길이 필터링
+         const durationInSeconds = parseDuration(video.contentDetails.duration);
+         const videoLengthCategory = getVideoLengthCategory(durationInSeconds);
+         
+         if (!matchesVideoLength(videoLengthCategory, selectedVideoLengths)) continue;
 
-        const result = {
-          youtube_channel_name: video.snippet.channelTitle,
-          thumbnail_url: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url,
-          status: 'active',
-          youtube_channel_id: video.snippet.channelId,
-          primary_category: await getCategoryName(video.snippet.categoryId),
-          status_date: video.snippet.publishedAt,
-          daily_view_count: viewCount,
-          vod_url: `https://www.youtube.com/watch?v=${video.id}`,
-          video_id: video.id,
-          title: video.snippet.title,
-          description: video.snippet.description,
-          duration: video.contentDetails.duration,
-          duration_seconds: durationInSeconds,
-          video_length_category: videoLengthCategory
-        };
+         const result = {
+           youtube_channel_name: video.snippet.channelTitle,
+           thumbnail_url: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url,
+           status: 'active',
+           youtube_channel_id: video.snippet.channelId,
+           primary_category: await getCategoryName(video.snippet.categoryId),
+           status_date: video.snippet.publishedAt,
+           daily_view_count: viewCount,
+           vod_url: `https://www.youtube.com/watch?v=${video.id}`,
+           video_id: video.id,
+           title: video.snippet.title,
+           description: video.snippet.description,
+           duration: video.contentDetails.duration,
+           duration_seconds: durationInSeconds,
+           video_length_category: videoLengthCategory
+         };
 
-        searchResults.push(result);
-        
-        if (searchResults.length >= finalMaxResults) break;
-      }
+         // 중복 제거 후 결과 추가
+         searchResults.push(result);
+         processedVideoIds.add(video.id); // 처리된 ID 기록
+         
+         if (searchResults.length >= finalMaxResults) break;
+       }
 
       nextPageToken = response.data.nextPageToken;
       if (!nextPageToken) break;
@@ -408,14 +455,19 @@ app.get('/api/search', async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // 조회수 기준 내림차순 정렬
-    searchResults.sort((a, b) => b.daily_view_count - a.daily_view_count);
+         // 조회수 기준 내림차순 정렬
+     searchResults.sort((a, b) => b.daily_view_count - a.daily_view_count);
 
-    console.log(`검색 완료: ${searchResults.length}개 결과`);
-        console.log(`📊 API 사용량: 검색 API ${Math.ceil(searchResults.length / 50)}회 + 상세정보 API ${Math.ceil(searchResults.length / 50)}회 (${finalMaxResults}건 요청 중 ${searchResults.length}건 결과)`);
-    
-    // API 키 사용 통계 출력
-    apiKeyManager.printUsageStats();
+     // 중복 제거 통계
+     const totalProcessed = processedVideoIds.size + searchResults.length;
+     const duplicatesRemoved = totalProcessed - searchResults.length;
+     
+     console.log(`검색 완료: ${searchResults.length}개 결과`);
+     console.log(`🔄 중복 제거: ${duplicatesRemoved}개 중복 동영상 제거됨`);
+     console.log(`📊 API 사용량: 검색 API ${Math.ceil(searchResults.length / 50)}회 + 상세정보 API ${Math.ceil(searchResults.length / 50)}회 (${finalMaxResults}건 요청 중 ${searchResults.length}건 결과)`);
+     
+     // API 키 사용 통계 출력
+     apiKeyManager.printUsageStats();
 
     res.json({
       success: true,

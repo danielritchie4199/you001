@@ -683,8 +683,12 @@
             console.log('===========================');
             
             if (isEmptyKeyword) {
-                console.log('키워드 없음: 인기 동영상 검색 모드');
-                showInfo('🔥 키워드가 없어서 조회수가 높은 인기 동영상들을 검색합니다.');
+                console.log('키워드 없음: 국가별 인기 동영상 검색 모드');
+                if (country === 'worldwide') {
+                    showInfo('🔥 키워드가 없어서 전세계 조회수가 높은 인기 동영상들을 검색합니다.');
+                } else {
+                    showInfo(`🔥 키워드가 없어서 ${country} 국가의 인기 동영상들을 검색합니다.`);
+                }
             } else {
                 console.log(`키워드 검색: "${keyword.trim()}"`);
             }
@@ -700,13 +704,16 @@
 
                 hideLoading();
 
-                if (data.success) {
-                    searchResults = data.data;
-                    currentPage = 1;
-                    sortResults();
-                    renderResults();
-                    showResults();
-                } else {
+                                 if (data.success) {
+                     searchResults = data.data;
+                     currentPage = 1;
+                     sortResults();
+                     renderResults();
+                     showResults();
+                     
+                     // 중복 제거 정보 표시 (콘솔에만)
+                     console.log(`✅ 검색 완료: ${searchResults.length}개 고유 결과`);
+                 } else {
                     // 오류 타입별 처리
                     if (data.errorType === 'quota_exceeded') {
                         showError(`
