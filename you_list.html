@@ -243,6 +243,13 @@
             color: #495057;
         }
 
+        .results-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
         .pagination-controls {
             display: flex;
             align-items: center;
@@ -254,6 +261,34 @@
             border: 1px solid #ced4da;
             border-radius: 6px;
             background: white;
+        }
+
+        .excel-download-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .excel-download-btn:hover {
+            background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+
+        .excel-download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .table-container {
@@ -446,8 +481,18 @@
                 align-items: stretch;
             }
             
+            .results-controls {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
             .pagination-controls {
                 justify-content: center;
+            }
+            
+            .excel-download-btn {
+                align-self: center;
+                width: fit-content;
             }
             
             .results-table {
@@ -519,6 +564,11 @@
                 <div class="form-group">
                     <label for="maxResults">검색 결과 수</label>
                     <select id="maxResults" name="maxResults">
+                        <option value="10">10건 (최소)</option>
+                        <option value="20">20건 (빠름)</option>
+                        <option value="30">30건 (적음)</option>
+                        <option value="40">40건 (소량)</option>
+                        <option value="50">50건 (기본)</option>
                         <option value="60" selected>60건 (빠름, quota 절약)</option>
                         <option value="100">100건 (균형)</option>
                         <option value="150">150건 (많음)</option>
@@ -581,14 +631,23 @@
                 <div class="results-info">
                     <span id="resultsCount">0</span>개의 결과가 검색되었습니다.
                 </div>
-                <div class="pagination-controls">
-                    <label>페이지당 표시:</label>
-                    <select id="itemsPerPage">
-                        <option value="30">30개</option>
-                        <option value="50">50개</option>
-                        <option value="100">100개</option>
-                        <option value="200">200개</option>
-                    </select>
+                <div class="results-controls">
+                    <div class="pagination-controls">
+                        <label>페이지당 표시:</label>
+                        <select id="itemsPerPage">
+                            <option value="10">10개</option>
+                            <option value="20">20개</option>
+                            <option value="30" selected>30개</option>
+                            <option value="40">40개</option>
+                            <option value="50">50개</option>
+                            <option value="100">100개</option>
+                            <option value="150">150개</option>
+                            <option value="200">200개</option>
+                        </select>
+                    </div>
+                    <button id="downloadExcelBtn" class="excel-download-btn" style="display: none;" title="클릭하면 저장 위치를 선택할 수 있습니다 (Chrome/Edge 86+ 지원)">
+                        📊 Excel
+                    </button>
                 </div>
             </div>
 
@@ -636,6 +695,11 @@
             itemsPerPage = parseInt(e.target.value);
             currentPage = 1;
             renderResults();
+        });
+
+        // Excel 다운로드 버튼 이벤트
+        document.getElementById('downloadExcelBtn').addEventListener('click', async () => {
+            await downloadExcel();
         });
 
         // 검색 수행 함수
@@ -1098,10 +1162,177 @@
 
         function showResults() {
             document.getElementById('resultsContainer').style.display = 'block';
+            // Excel 다운로드 버튼 표시
+            document.getElementById('downloadExcelBtn').style.display = 'flex';
         }
 
         function hideResults() {
             document.getElementById('resultsContainer').style.display = 'none';
+            // Excel 다운로드 버튼 숨김
+            document.getElementById('downloadExcelBtn').style.display = 'none';
+        }
+
+        // Excel 다운로드 함수
+        async function downloadExcel() {
+            if (!searchResults || searchResults.length === 0) {
+                alert('다운로드할 검색 결과가 없습니다.');
+                return;
+            }
+
+            try {
+                const downloadBtn = document.getElementById('downloadExcelBtn');
+                const originalText = downloadBtn.textContent;
+                
+                // 버튼 상태 변경
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = '📊 Excel 생성 중...';
+
+                // 현재 검색 조건 수집
+                const searchParams = {
+                    keyword: document.getElementById('keyword').value || '전체',
+                    country: document.getElementById('country').value || 'worldwide',
+                    minViews: document.getElementById('minViews').value,
+                    maxViews: document.getElementById('maxViews').value,
+                    uploadPeriod: document.getElementById('uploadPeriod').value,
+                    maxResults: document.getElementById('maxResults').value
+                };
+
+                console.log('Excel 다운로드 요청:', {
+                    resultsCount: searchResults.length,
+                    searchParams: searchParams
+                });
+
+                // 서버에 Excel 생성 요청
+                const response = await fetch('/api/download-excel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        searchResults: searchResults,
+                        searchParams: searchParams
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`서버 오류: ${response.status}`);
+                }
+
+                // 파일명을 응답 헤더에서 추출하거나 기본값 사용
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'YouTube_검색결과.xlsx';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch) {
+                        filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
+                    }
+                }
+
+                // 파일 다운로드 (폴더 선택 가능)
+                const blob = await response.blob();
+                await downloadExcelWithFolderChoice(blob, filename);
+
+                console.log(`✅ Excel 파일 다운로드 완료: ${filename}`);
+                alert(`✅ Excel 파일이 다운로드되었습니다!\n파일명: ${filename}\n데이터: ${searchResults.length}행`);
+
+            } catch (error) {
+                console.error('Excel 다운로드 오류:', error);
+                alert('Excel 파일 다운로드에 실패했습니다. 잠시 후 다시 시도해주세요.');
+            } finally {
+                // 버튼 상태 복원
+                const downloadBtn = document.getElementById('downloadExcelBtn');
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = originalText;
+            }
+        }
+
+        // Excel 파일 다운로드 (폴더 선택 가능)
+        async function downloadExcelWithFolderChoice(blob, filename) {
+            try {
+                // 최신 브라우저에서 File System Access API 지원 확인
+                if ('showSaveFilePicker' in window) {
+                    // File System Access API 사용 (Chrome 86+, Edge 86+)
+                    await downloadExcelWithFilePicker(blob, filename);
+                } else if ('showDirectoryPicker' in window) {
+                    // Directory Picker API 사용 (대체 방법)
+                    await downloadExcelWithDirectoryPicker(blob, filename);
+                } else {
+                    // 기존 방식 (자동 다운로드) - 브라우저 호환성을 위한 fallback
+                    await downloadExcelWithTraditionalMethod(blob, filename);
+                }
+            } catch (error) {
+                console.error('Excel 다운로드 오류:', error);
+                // 오류 발생 시 기본 방식으로 fallback
+                await downloadExcelWithTraditionalMethod(blob, filename);
+            }
+        }
+
+        // File System Access API를 사용한 Excel 파일 저장 (위치 선택 가능)
+        async function downloadExcelWithFilePicker(blob, filename) {
+            try {
+                // 파일 저장 위치 선택 다이얼로그 표시
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: filename,
+                    types: [{
+                        description: 'Excel 파일',
+                        accept: {
+                            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+                            'application/vnd.ms-excel': ['.xls']
+                        }
+                    }]
+                });
+
+                // 선택한 위치에 파일 저장
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                
+                console.log(`✅ Excel 파일이 선택한 위치에 저장되었습니다: ${filename}`);
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('사용자가 저장을 취소했습니다.');
+                    throw new Error('저장이 취소되었습니다.');
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        // Directory Picker API를 사용한 Excel 파일 저장
+        async function downloadExcelWithDirectoryPicker(blob, filename) {
+            try {
+                // 폴더 선택 다이얼로그 표시
+                const dirHandle = await window.showDirectoryPicker();
+                
+                // 선택한 폴더에 파일 생성 및 저장
+                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                
+                console.log(`✅ Excel 파일이 선택한 폴더에 저장되었습니다: ${filename}`);
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('사용자가 폴더 선택을 취소했습니다.');
+                    throw new Error('폴더 선택이 취소되었습니다.');
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        // 기존 방식 Excel 다운로드 (브라우저 호환성 fallback)
+        async function downloadExcelWithTraditionalMethod(blob, filename) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            console.log(`📁 Excel 파일이 기본 다운로드 폴더에 저장됩니다: ${filename}`);
         }
 
         // 동영상 재생시간을 HH:MM:SS 형식으로 변환하는 함수

@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const { google } = require('googleapis');
 const axios = require('axios');
+const XLSX = require('xlsx');
 require('dotenv').config();
 
 // 다중 API 키 관리 시스템
@@ -58,6 +59,10 @@ class ApiKeyManager {
       console.log('⚠️ 모든 API 키의 할당량이 초과되었습니다. 첫 번째 키로 재시도합니다.');
       // 모든 키가 초과된 경우 첫 번째 키 사용 (다음 날까지 대기)
       availableKey = this.apiKeys[0];
+    } else {
+      // 사용 가능한 키가 있으면 현재 인덱스 업데이트
+      this.currentKeyIndex = availableKey.index - 1;
+      console.log(`🔑 현재 사용 가능한 키: ${availableKey.name} (인덱스: ${this.currentKeyIndex + 1})`);
     }
     
     return availableKey;
@@ -80,17 +85,22 @@ class ApiKeyManager {
       currentKey.quotaExceeded = true;
       console.log(`❌ ${currentKey.name} 할당량 초과로 비활성화됨`);
       
-      // 다음 사용 가능한 키로 전환
-      const nextKey = this.apiKeys.find(keyInfo => !keyInfo.quotaExceeded);
+      // 다음 사용 가능한 키 찾기 (현재 키 제외)
+      const nextKey = this.apiKeys.find(keyInfo => 
+        keyInfo.index !== currentKey.index && !keyInfo.quotaExceeded
+      );
+      
       if (nextKey) {
         console.log(`🔄 ${nextKey.name}으로 전환합니다.`);
-        return true; // 전환 성공
+        // 현재 키 인덱스 업데이트
+        this.currentKeyIndex = nextKey.index - 1;
+        return nextKey; // 전환된 키 반환
       } else {
         console.log('⚠️ 사용 가능한 API 키가 없습니다.');
-        return false; // 전환 실패
+        return null; // 전환 실패
       }
     }
-    return false;
+    return null;
   }
   
   // 사용 통계 출력
@@ -99,8 +109,27 @@ class ApiKeyManager {
     this.apiKeys.forEach(keyInfo => {
       const status = keyInfo.quotaExceeded ? '❌ 할당량 초과' : '✅ 사용 가능';
       const lastUsed = keyInfo.lastUsed ? keyInfo.lastUsed.toLocaleString() : '미사용';
-      console.log(`   ${keyInfo.name}: ${status} | 사용횟수: ${keyInfo.usageCount} | 마지막 사용: ${lastUsed}`);
+      const currentIndicator = keyInfo.index === this.currentKeyIndex + 1 ? ' 🔑 현재' : '';
+      const quotaInfo = keyInfo.quotaExceeded ? ' (할당량 초과)' : '';
+      console.log(`   ${keyInfo.name}: ${status} | 사용횟수: ${keyInfo.usageCount} | 마지막 사용: ${lastUsed}${currentIndicator}${quotaInfo}`);
     });
+    
+    const availableKeys = this.apiKeys.filter(key => !key.quotaExceeded);
+    const exhaustedKeys = this.apiKeys.filter(key => key.quotaExceeded);
+    
+    console.log(`\n📈 요약: ${availableKeys.length}/${this.apiKeys.length} 키 사용 가능`);
+    if (exhaustedKeys.length > 0) {
+      console.log(`   할당량 초과된 키: ${exhaustedKeys.map(k => k.name).join(', ')}`);
+    }
+    if (availableKeys.length > 0) {
+      console.log(`   사용 가능한 키: ${availableKeys.map(k => k.name).join(', ')}`);
+    }
+    
+    // 현재 활성 키 정보
+    const currentKey = this.apiKeys[this.currentKeyIndex];
+    if (currentKey) {
+      console.log(`\n🔑 현재 활성 키: ${currentKey.name} (${currentKey.quotaExceeded ? '할당량 초과' : '정상'})`);
+    }
   }
 }
 
@@ -134,7 +163,7 @@ app.get('/api/search', async (req, res) => {
     } = req.query;
 
     // maxResults 유효성 검사 및 변환
-    const allowedResults = [60, 100, 150, 200];
+    const allowedResults = [10, 20, 30, 40, 50, 60, 100, 150, 200];
     const parsedMaxResults = parseInt(maxResults);
     const finalMaxResults = allowedResults.includes(parsedMaxResults) ? parsedMaxResults : 60;
 
@@ -284,28 +313,40 @@ app.get('/api/search', async (req, res) => {
        } catch (apiError) {
         console.error('YouTube API 오류:', apiError.message);
         
-        // 할당량 초과 오류 처리
-        if (apiError.message.includes('quota') || apiError.message.includes('quotaExceeded')) {
-          console.log(`🚫 ${currentApiKey.name} 할당량 초과 감지`);
-          
-          if (apiKeyManager.markKeyAsQuotaExceeded(currentApiKey)) {
-            console.log('🔄 다른 API 키로 재시도합니다...');
-            try {
-              const youtube = apiKeyManager.getYouTubeInstance();
-              response = await youtube.search.list(searchParams);
-              console.log('✅ 다른 API 키로 성공');
-            } catch (retryError) {
-              if (retryError.message.includes('quota') || retryError.message.includes('quotaExceeded')) {
-                console.log('❌ 모든 API 키의 할당량이 초과되었습니다.');
-                throw retryError;
-              } else {
-                throw retryError;
+                          // 할당량 초과 오류 처리
+          if (apiError.message.includes('quota') || apiError.message.includes('quotaExceeded')) {
+            console.log(`🚫 ${currentApiKey.name} 할당량 초과 감지`);
+            
+            const newApiKey = apiKeyManager.markKeyAsQuotaExceeded(currentApiKey);
+            if (newApiKey) {
+              console.log(`🔄 ${newApiKey.name}로 재시도합니다...`);
+              try {
+                // 새로운 API 키로 YouTube 인스턴스 직접 생성
+                const youtube = google.youtube({ version: 'v3', auth: newApiKey.key });
+                response = await youtube.search.list(searchParams);
+                console.log(`✅ ${newApiKey.name}로 성공`);
+              } catch (retryError) {
+                if (retryError.message.includes('quota') || retryError.message.includes('quotaExceeded')) {
+                  console.log(`❌ ${newApiKey.name}도 할당량 초과, 다음 키로 재시도...`);
+                  // 재귀적으로 다음 키 시도
+                  const nextKey = apiKeyManager.markKeyAsQuotaExceeded(newApiKey);
+                  if (nextKey) {
+                    console.log(`🔄 ${nextKey.name}로 재시도...`);
+                    const youtube = google.youtube({ version: 'v3', auth: nextKey.key });
+                    response = await youtube.search.list(searchParams);
+                    console.log(`✅ ${nextKey.name}로 성공`);
+                  } else {
+                    console.log('❌ 모든 API 키의 할당량이 초과되었습니다.');
+                    throw retryError;
+                  }
+                } else {
+                  throw retryError;
+                }
               }
+            } else {
+              throw apiError; // 사용 가능한 키가 없으면 오류 전파
             }
-          } else {
-            throw apiError; // 사용 가능한 키가 없으면 오류 전파
           }
-        }
         // regionCode 관련 오류인 경우 처리
         else if ((apiError.message.includes('regionCode') || apiError.message.includes('invalid region')) && searchParams.regionCode) {
           console.log('🚨 regionCode 오류 발생!');
@@ -383,26 +424,48 @@ app.get('/api/search', async (req, res) => {
           part: 'snippet,statistics,contentDetails',
           id: videoIds.join(',')
         });
-      } catch (detailError) {
-        if (detailError.message.includes('quota') || detailError.message.includes('quotaExceeded')) {
-          console.log('🚫 비디오 상세정보 조회 중 할당량 초과 감지');
-          
-          let currentDetailKey = apiKeyManager.getCurrentKey();
-          if (apiKeyManager.markKeyAsQuotaExceeded(currentDetailKey)) {
-            console.log('🔄 다른 API 키로 비디오 상세정보 재시도...');
-            const youtube = apiKeyManager.getYouTubeInstance();
-            videoDetails = await youtube.videos.list({
-              part: 'snippet,statistics,contentDetails',
-              id: videoIds.join(',')
-            });
-            console.log('✅ 다른 API 키로 비디오 상세정보 조회 성공');
+                           } catch (detailError) {
+          if (detailError.message.includes('quota') || detailError.message.includes('quotaExceeded')) {
+            console.log('🚫 비디오 상세정보 조회 중 할당량 초과 감지');
+            
+            let currentDetailKey = apiKeyManager.getCurrentKey();
+            const newDetailKey = apiKeyManager.markKeyAsQuotaExceeded(currentDetailKey);
+            if (newDetailKey) {
+              console.log(`🔄 ${newDetailKey.name}로 비디오 상세정보 재시도...`);
+              
+              try {
+                const youtube = google.youtube({ version: 'v3', auth: newDetailKey.key });
+                videoDetails = await youtube.videos.list({
+                  part: 'snippet,statistics,contentDetails',
+                  id: videoIds.join(',')
+                });
+                console.log(`✅ ${newDetailKey.name}로 비디오 상세정보 조회 성공`);
+              } catch (retryDetailError) {
+                if (retryDetailError.message.includes('quota') || retryDetailError.message.includes('quotaExceeded')) {
+                  console.log(`❌ ${newDetailKey.name}도 할당량 초과, 다음 키로 재시도...`);
+                  const nextDetailKey = apiKeyManager.markKeyAsQuotaExceeded(newDetailKey);
+                  if (nextDetailKey) {
+                    console.log(`🔄 ${nextDetailKey.name}로 비디오 상세정보 재시도...`);
+                    const youtube = google.youtube({ version: 'v3', auth: nextDetailKey.key });
+                    videoDetails = await youtube.videos.list({
+                      part: 'snippet,statistics,contentDetails',
+                      id: videoIds.join(',')
+                    });
+                    console.log(`✅ ${nextDetailKey.name}로 비디오 상세정보 조회 성공`);
+                  } else {
+                    throw retryDetailError;
+                  }
+                } else {
+                  throw retryDetailError;
+                }
+              }
+            } else {
+              throw detailError;
+            }
           } else {
             throw detailError;
           }
-        } else {
-          throw detailError;
         }
-      }
 
              // 검색 결과 처리 (중복 제거)
        for (const video of videoDetails.data.items) {
@@ -540,6 +603,105 @@ app.get('/api/download-thumbnail', async (req, res) => {
     res.status(500).json({ error: '썸네일 다운로드에 실패했습니다.' });
   }
 });
+
+// Excel 다운로드 API
+app.post('/api/download-excel', async (req, res) => {
+  try {
+    const { searchResults, searchParams } = req.body;
+    
+    if (!searchResults || !Array.isArray(searchResults)) {
+      return res.status(400).json({ error: '검색 결과 데이터가 필요합니다.' });
+    }
+
+    // Excel용 데이터 변환
+    const excelData = searchResults.map((result, index) => {
+      return {
+        '순번': index + 1,
+        '채널명': result.youtube_channel_name || '',
+        '채널 ID': result.youtube_channel_id || '',
+        '동영상 제목': result.title || '',
+        '카테고리': result.primary_category || '',
+        '업로드일': result.status_date ? new Date(result.status_date).toLocaleDateString('ko-KR') : '',
+        '조회수': parseInt(result.daily_view_count || 0).toLocaleString(),
+        '시간(초)': result.duration_seconds || 0,
+        '시간(형식)': formatDurationForExcel(result.duration_seconds),
+        '동영상 길이': result.video_length_category || '',
+        '상태': result.status || '',
+        'URL': result.vod_url || '',
+        '썸네일 URL': result.thumbnail_url || ''
+      };
+    });
+
+    // 워크북 생성
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    // 컬럼 너비 자동 조정
+    const columnWidths = [
+      { wch: 6 },  // 순번
+      { wch: 25 }, // 채널명
+      { wch: 20 }, // 채널 ID
+      { wch: 40 }, // 동영상 제목
+      { wch: 15 }, // 카테고리
+      { wch: 12 }, // 업로드일
+      { wch: 12 }, // 조회수
+      { wch: 8 },  // 시간(초)
+      { wch: 10 }, // 시간(형식)
+      { wch: 12 }, // 동영상 길이
+      { wch: 10 }, // 상태
+      { wch: 50 }, // URL
+      { wch: 50 }  // 썸네일 URL
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // 워크시트를 워크북에 추가
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'YouTube 검색 결과');
+
+    // Excel 파일을 버퍼로 생성
+    const excelBuffer = XLSX.write(workbook, { 
+      type: 'buffer', 
+      bookType: 'xlsx',
+      compression: true 
+    });
+
+    // 파일명 생성 (검색 조건 포함)
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const keyword = searchParams?.keyword || '전체';
+    const country = searchParams?.country || 'worldwide';
+    const filename = `YouTube_검색결과_${keyword}_${country}_${timestamp}.xlsx`;
+
+    // 응답 헤더 설정
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Length', excelBuffer.length);
+
+    // Excel 파일 전송
+    res.send(excelBuffer);
+
+    console.log(`✅ Excel 파일 생성 완료: ${filename} (${searchResults.length}행)`);
+
+  } catch (error) {
+    console.error('Excel 다운로드 오류:', error);
+    res.status(500).json({ error: 'Excel 파일 생성에 실패했습니다.' });
+  }
+});
+
+// Excel용 시간 포맷 함수
+function formatDurationForExcel(durationSeconds) {
+  if (!durationSeconds || durationSeconds === 0) {
+    return '00:00';
+  }
+  
+  const hours = Math.floor(durationSeconds / 3600);
+  const minutes = Math.floor((durationSeconds % 3600) / 60);
+  const seconds = durationSeconds % 60;
+  
+  if (hours > 0) {
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  } else {
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+}
 
 // 헬퍼 함수들
 function getCountryCode(country) {
