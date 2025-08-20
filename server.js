@@ -625,7 +625,7 @@ app.post('/api/download-excel', async (req, res) => {
         '조회수': parseInt(result.daily_view_count || 0).toLocaleString(),
         '시간(초)': result.duration_seconds || 0,
         '시간(형식)': formatDurationForExcel(result.duration_seconds),
-        '동영상 길이': result.video_length_category || '',
+        '동영상 길이': formatVideoLengthForExcel(result.video_length_category) || '',
         '상태': result.status || '',
         'URL': result.vod_url || '',
         '썸네일 URL': result.thumbnail_url || ''
@@ -701,6 +701,24 @@ function formatDurationForExcel(durationSeconds) {
   } else {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
+}
+
+// Excel용 동영상 길이 카테고리 포맷 함수
+function formatVideoLengthForExcel(category) {
+  const categoryMap = {
+    'short1': 'Short Form1 (1분 미만)',
+    'short2': 'Short Form2 (1분 이상 2분 미만)',
+    'mid1': 'Mid Form1 (2분 이상 10분 미만)',
+    'mid2': 'Mid Form2 (10분 이상 20분 미만)',
+    'long1': 'Long Form1 (20분 이상 30분 미만)',
+    'long2': 'Long Form2 (30분 이상 40분 미만)',
+    'long3': 'Long Form3 (40분 이상 50분 미만)',
+    'long4': 'Long Form4 (50분 이상 60분 미만)',
+    'long5': 'Long Form5 (60분 이상 90분 미만)',
+    'long6': 'Long Form6 (90분 이상)'
+  };
+  
+  return categoryMap[category] || category || '알 수 없음';
 }
 
 // 헬퍼 함수들
@@ -826,10 +844,16 @@ function parseDuration(duration) {
 
 // 동영상 길이 분류 함수
 function getVideoLengthCategory(durationInSeconds) {
-  if (durationInSeconds < 120) return 'short';        // 2분 미만
-  if (durationInSeconds < 600) return 'mid';          // 2분 이상 10분 미만
-  if (durationInSeconds < 1800) return 'long1';      // 10분 이상 30분 미만
-  return 'long2';                                     // 30분 이상
+  if (durationInSeconds < 60) return 'short1';       // 1분 미만
+  if (durationInSeconds < 120) return 'short2';      // 1분 이상 2분 미만
+  if (durationInSeconds < 600) return 'mid1';        // 2분 이상 10분 미만
+  if (durationInSeconds < 1200) return 'mid2';       // 10분 이상 20분 미만
+  if (durationInSeconds < 1800) return 'long1';      // 20분 이상 30분 미만
+  if (durationInSeconds < 2400) return 'long2';      // 30분 이상 40분 미만
+  if (durationInSeconds < 3000) return 'long3';      // 40분 이상 50분 미만
+  if (durationInSeconds < 3600) return 'long4';      // 50분 이상 60분 미만
+  if (durationInSeconds < 5400) return 'long5';      // 60분 이상 90분 미만
+  return 'long6';                                    // 90분 이상
 }
 
 // 선택된 길이 카테고리와 매치되는지 확인

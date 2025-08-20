@@ -127,7 +127,7 @@
         .video-length-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            gap: 15px;
             align-items: start;
         }
 
@@ -565,11 +565,11 @@
                     <label for="maxResults">검색 결과 수</label>
                     <select id="maxResults" name="maxResults">
                         <option value="10">10건 (최소)</option>
-                        <option value="20">20건 (빠름)</option>
+                        <option value="20" selected>20건 (기본)</option>
                         <option value="30">30건 (적음)</option>
                         <option value="40">40건 (소량)</option>
-                        <option value="50">50건 (기본)</option>
-                        <option value="60" selected>60건 (빠름, quota 절약)</option>
+                        <option value="50">50건 (적당)</option>
+                        <option value="60">60건 (quota 절약)</option>
                         <option value="100">100건 (균형)</option>
                         <option value="150">150건 (많음)</option>
                         <option value="200">200건 (최대)</option>
@@ -596,20 +596,44 @@
                 <label class="section-label">동영상 길이</label>
                 <div class="video-length-grid">
                     <div class="checkbox-item">
-                        <input type="checkbox" id="shortForm" name="videoLength" value="short" checked>
-                        <label for="shortForm">Short Form<br><span class="duration-desc">(2분 미만)</span></label>
+                        <input type="checkbox" id="shortForm1" name="videoLength" value="short1" checked>
+                        <label for="shortForm1">Short Form1<br><span class="duration-desc">(1분 미만)</span></label>
                     </div>
                     <div class="checkbox-item">
-                        <input type="checkbox" id="midForm" name="videoLength" value="mid" checked>
-                        <label for="midForm">Mid Form<br><span class="duration-desc">(2분 이상 10분 미만)</span></label>
+                        <input type="checkbox" id="shortForm2" name="videoLength" value="short2" checked>
+                        <label for="shortForm2">Short Form2<br><span class="duration-desc">(1분 이상 2분 미만)</span></label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="midForm1" name="videoLength" value="mid1" checked>
+                        <label for="midForm1">Mid Form1<br><span class="duration-desc">(2분 이상 10분 미만)</span></label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="midForm2" name="videoLength" value="mid2" checked>
+                        <label for="midForm2">Mid Form2<br><span class="duration-desc">(10분 이상 20분 미만)</span></label>
                     </div>
                     <div class="checkbox-item">
                         <input type="checkbox" id="longForm1" name="videoLength" value="long1" checked>
-                        <label for="longForm1">Long Form1<br><span class="duration-desc">(10분 이상 30분 미만)</span></label>
+                        <label for="longForm1">Long Form1<br><span class="duration-desc">(20분 이상 30분 미만)</span></label>
                     </div>
                     <div class="checkbox-item">
-                        <input type="checkbox" id="longForm2" name="videoLength" value="long2" checked>
-                        <label for="longForm2">Long Form2<br><span class="duration-desc">(30분 이상)</span></label>
+                        <input type="checkbox" id="longForm2" name="videoLength" value="long2">
+                        <label for="longForm2">Long Form2<br><span class="duration-desc">(30분 이상 40분 미만)</span></label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="longForm3" name="videoLength" value="long3">
+                        <label for="longForm3">Long Form3<br><span class="duration-desc">(40분 이상 50분 미만)</span></label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="longForm4" name="videoLength" value="long4">
+                        <label for="longForm4">Long Form4<br><span class="duration-desc">(50분 이상 60분 미만)</span></label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="longForm5" name="videoLength" value="long5">
+                        <label for="longForm5">Long Form5<br><span class="duration-desc">(60분 이상 90분 미만)</span></label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="longForm6" name="videoLength" value="long6">
+                        <label for="longForm6">Long Form6<br><span class="duration-desc">(90분 이상)</span></label>
                     </div>
                 </div>
             </div>
@@ -719,16 +743,28 @@
             }
 
             // 비디오 길이 체크박스 처리
-            const shortForm = document.getElementById('shortForm').checked;
-            const midForm = document.getElementById('midForm').checked;
+            const shortForm1 = document.getElementById('shortForm1').checked;
+            const shortForm2 = document.getElementById('shortForm2').checked;
+            const midForm1 = document.getElementById('midForm1').checked;
+            const midForm2 = document.getElementById('midForm2').checked;
             const longForm1 = document.getElementById('longForm1').checked;
             const longForm2 = document.getElementById('longForm2').checked;
+            const longForm3 = document.getElementById('longForm3').checked;
+            const longForm4 = document.getElementById('longForm4').checked;
+            const longForm5 = document.getElementById('longForm5').checked;
+            const longForm6 = document.getElementById('longForm6').checked;
             
             const selectedLengths = [];
-            if (shortForm) selectedLengths.push('short');
-            if (midForm) selectedLengths.push('mid');
+            if (shortForm1) selectedLengths.push('short1');
+            if (shortForm2) selectedLengths.push('short2');
+            if (midForm1) selectedLengths.push('mid1');
+            if (midForm2) selectedLengths.push('mid2');
             if (longForm1) selectedLengths.push('long1');
             if (longForm2) selectedLengths.push('long2');
+            if (longForm3) selectedLengths.push('long3');
+            if (longForm4) selectedLengths.push('long4');
+            if (longForm5) selectedLengths.push('long5');
+            if (longForm6) selectedLengths.push('long6');
             
             if (selectedLengths.length > 0) {
                 searchParams.append('videoLength', selectedLengths.join(','));
@@ -1185,7 +1221,7 @@
                 
                 // 버튼 상태 변경
                 downloadBtn.disabled = true;
-                downloadBtn.textContent = '📊 Excel 생성 중...';
+                downloadBtn.textContent = '📊 Excel ...';
 
                 // 현재 검색 조건 수집
                 const searchParams = {
@@ -1233,14 +1269,19 @@
                 await downloadExcelWithFolderChoice(blob, filename);
 
                 console.log(`✅ Excel 파일 다운로드 완료: ${filename}`);
+                
+                // alert 창을 표시하고, 확인 버튼을 누른 후에 버튼 상태 복원
                 alert(`✅ Excel 파일이 다운로드되었습니다!\n파일명: ${filename}\n데이터: ${searchResults.length}행`);
+                
+                // alert 창이 닫힌 후에 버튼 상태 복원
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = originalText;
 
             } catch (error) {
                 console.error('Excel 다운로드 오류:', error);
                 alert('Excel 파일 다운로드에 실패했습니다. 잠시 후 다시 시도해주세요.');
-            } finally {
-                // 버튼 상태 복원
-                const downloadBtn = document.getElementById('downloadExcelBtn');
+                
+                // 오류 발생 시에도 alert 창이 닫힌 후에 버튼 상태 복원
                 downloadBtn.disabled = false;
                 downloadBtn.textContent = originalText;
             }
