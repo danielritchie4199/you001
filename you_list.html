@@ -116,12 +116,52 @@
             margin-bottom: 25px;
         }
 
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
         .section-label {
             font-weight: 600;
             font-size: 1.1em;
             color: #333;
-            margin-bottom: 15px;
-            display: block;
+            margin: 0;
+        }
+
+        .select-controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .select-all-container,
+        .select-group-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .select-all-container input[type="checkbox"],
+        .select-group-container input[type="checkbox"] {
+            transform: scale(1.1);
+            cursor: pointer;
+        }
+
+        .select-all-container label,
+        .select-group-container label {
+            cursor: pointer;
+            font-weight: 500;
+            user-select: none;
+        }
+
+        .select-group-container {
+            font-size: 0.85em;
+            color: #666;
         }
 
         .video-length-grid {
@@ -598,7 +638,23 @@
 
             <!-- 동영상 길이 선택 (별도 섹션으로 분리하여 넓은 공간 확보) -->
             <div class="video-length-section">
-                <label class="section-label">동영상 길이</label>
+                <div class="section-header">
+                    <label class="section-label">동영상 길이</label>
+                    <div class="select-controls">
+                        <div class="select-all-container">
+                            <input type="checkbox" id="selectAllVideoLength" checked>
+                            <label for="selectAllVideoLength">모두 선택</label>
+                        </div>
+                        <div class="select-group-container">
+                            <input type="checkbox" id="selectTop5VideoLength">
+                            <label for="selectTop5VideoLength">위 5개 선택</label>
+                        </div>
+                        <div class="select-group-container">
+                            <input type="checkbox" id="selectBottom5VideoLength">
+                            <label for="selectBottom5VideoLength">밑 5개 선택</label>
+                        </div>
+                    </div>
+                </div>
                 <div class="video-length-grid">
                     <div class="checkbox-item">
                         <input type="checkbox" id="shortForm1" name="videoLength" value="short1" checked>
@@ -675,7 +731,7 @@
                         </select>
                     </div>
                     <button id="downloadExcelBtn" class="excel-download-btn" style="display: none;" title="클릭하면 저장 위치를 선택할 수 있습니다 (Chrome/Edge 86+ 지원)">
-                        📊 Excel
+                        📊
                     </button>
                 </div>
             </div>
@@ -730,6 +786,142 @@
         // Excel 다운로드 버튼 이벤트
         document.getElementById('downloadExcelBtn').addEventListener('click', async () => {
             await downloadExcel();
+        });
+
+        // 동영상 길이 "모두 선택" 체크박스 이벤트
+        document.getElementById('selectAllVideoLength').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const videoLengthCheckboxes = [
+                'shortForm1', 'shortForm2', 'midForm1', 'midForm2', 
+                'longForm1', 'longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'
+            ];
+            
+            videoLengthCheckboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.checked = isChecked;
+                }
+            });
+            
+            // 그룹 선택 체크박스 상태도 업데이트
+            updateGroupCheckboxes();
+        });
+
+        // 동영상 길이 "위 5개 선택" 체크박스 이벤트
+        document.getElementById('selectTop5VideoLength').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const top5Checkboxes = ['shortForm1', 'shortForm2', 'midForm1', 'midForm2', 'longForm1'];
+            
+            top5Checkboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.checked = isChecked;
+                }
+            });
+            
+            updateSelectAllVideoLength();
+            updateGroupCheckboxes();
+        });
+
+        // 동영상 길이 "밑 5개 선택" 체크박스 이벤트
+        document.getElementById('selectBottom5VideoLength').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const bottom5Checkboxes = ['longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'];
+            
+            bottom5Checkboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.checked = isChecked;
+                }
+            });
+            
+            updateSelectAllVideoLength();
+            updateGroupCheckboxes();
+        });
+
+        // 개별 동영상 길이 체크박스 변경 시 "모두 선택" 상태 업데이트
+        function updateSelectAllVideoLength() {
+            const videoLengthCheckboxes = [
+                'shortForm1', 'shortForm2', 'midForm1', 'midForm2', 
+                'longForm1', 'longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'
+            ];
+            
+            const checkedCount = videoLengthCheckboxes.filter(id => {
+                const checkbox = document.getElementById(id);
+                return checkbox && checkbox.checked;
+            }).length;
+            
+            const selectAllCheckbox = document.getElementById('selectAllVideoLength');
+            if (checkedCount === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCount === videoLengthCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+
+        // 그룹 체크박스 상태 업데이트
+        function updateGroupCheckboxes() {
+            const top5Checkboxes = ['shortForm1', 'shortForm2', 'midForm1', 'midForm2', 'longForm1'];
+            const bottom5Checkboxes = ['longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'];
+            
+            // 위 5개 체크박스 상태 확인
+            const top5CheckedCount = top5Checkboxes.filter(id => {
+                const checkbox = document.getElementById(id);
+                return checkbox && checkbox.checked;
+            }).length;
+            
+            const selectTop5Checkbox = document.getElementById('selectTop5VideoLength');
+            if (top5CheckedCount === 0) {
+                selectTop5Checkbox.checked = false;
+                selectTop5Checkbox.indeterminate = false;
+            } else if (top5CheckedCount === top5Checkboxes.length) {
+                selectTop5Checkbox.checked = true;
+                selectTop5Checkbox.indeterminate = false;
+            } else {
+                selectTop5Checkbox.checked = false;
+                selectTop5Checkbox.indeterminate = true;
+            }
+            
+            // 밑 5개 체크박스 상태 확인
+            const bottom5CheckedCount = bottom5Checkboxes.filter(id => {
+                const checkbox = document.getElementById(id);
+                return checkbox && checkbox.checked;
+            }).length;
+            
+            const selectBottom5Checkbox = document.getElementById('selectBottom5VideoLength');
+            if (bottom5CheckedCount === 0) {
+                selectBottom5Checkbox.checked = false;
+                selectBottom5Checkbox.indeterminate = false;
+            } else if (bottom5CheckedCount === bottom5Checkboxes.length) {
+                selectBottom5Checkbox.checked = true;
+                selectBottom5Checkbox.indeterminate = false;
+            } else {
+                selectBottom5Checkbox.checked = false;
+                selectBottom5Checkbox.indeterminate = true;
+            }
+        }
+
+        // 개별 체크박스에 이벤트 리스너 추가
+        document.addEventListener('DOMContentLoaded', () => {
+            const videoLengthCheckboxes = [
+                'shortForm1', 'shortForm2', 'midForm1', 'midForm2', 
+                'longForm1', 'longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'
+            ];
+            
+            videoLengthCheckboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.addEventListener('change', () => {
+                        updateSelectAllVideoLength();
+                        updateGroupCheckboxes();
+                    });
+                }
+            });
         });
 
         // 검색 수행 함수
@@ -1231,7 +1423,7 @@
                 
                 // 버튼 상태 변경
                 downloadBtn.disabled = true;
-                downloadBtn.textContent = '📊 Excel ...';
+                downloadBtn.textContent = '📊 ~';
 
                 // 현재 검색 조건 수집
                 const searchParams = {
@@ -1243,8 +1435,26 @@
                     maxResults: document.getElementById('maxResults').value
                 };
 
+                // Excel 생성에 필요한 데이터만 추출하여 페이로드 크기 최적화
+                const optimizedResults = searchResults.map(result => ({
+                    youtube_channel_name: result.youtube_channel_name,
+                    thumbnail_url: result.thumbnail_url,
+                    status: result.status,
+                    youtube_channel_id: result.youtube_channel_id,
+                    title: result.title,
+                    daily_view_count: result.daily_view_count,
+                    subscriber_count: result.subscriber_count,
+                    vod_url: result.vod_url,
+                    status_date: result.status_date,
+                    duration_seconds: result.duration_seconds,
+                    video_length_category: result.video_length_category,
+                    primary_category: result.primary_category
+                }));
+
                 console.log('Excel 다운로드 요청:', {
-                    resultsCount: searchResults.length,
+                    resultsCount: optimizedResults.length,
+                    originalSize: JSON.stringify(searchResults).length,
+                    optimizedSize: JSON.stringify(optimizedResults).length,
                     searchParams: searchParams
                 });
 
@@ -1255,7 +1465,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        searchResults: searchResults,
+                        searchResults: optimizedResults,
                         searchParams: searchParams
                     })
                 });

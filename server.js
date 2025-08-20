@@ -141,7 +141,9 @@ const PORT = process.env.PORT || 3000;
 
 // 미들웨어 설정
 app.use(cors());
-app.use(express.json());
+// 대용량 데이터 처리를 위한 body-parser 제한 증가
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(__dirname));
 
 // 메인 페이지 라우트
@@ -670,11 +672,14 @@ app.post('/api/download-excel', async (req, res) => {
       compression: true 
     });
 
-    // 파일명 생성 (검색 조건 포함)
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    // 파일명 생성 (검색 조건 포함) - 대한민국 시간 기준
+    const now = new Date();
+    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9 (대한민국 시간)
+    const timestamp = kstTime.toISOString().slice(0, 19).replace(/:/g, '-');
     const keyword = searchParams?.keyword || '전체';
     const country = searchParams?.country || 'worldwide';
-    const filename = `YouTube_검색결과_${keyword}_${country}_${timestamp}.xlsx`;
+    const resultCount = searchResults.length;
+    const filename = `YouTube_${keyword}_${country}_[${resultCount}]_${timestamp}.xlsx`;
 
     // 응답 헤더 설정
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
