@@ -563,8 +563,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎥 YouTube 채널 검색 시스템</h1>
-            <p>전세계 유튜브 채널에서 원하는 동영상을 찾아보세요</p>
+            <h1>🎥 YouTube Search</h1>
+            <p>전세계 유튜브 채널에서 원하는 동영상을 찾아봅시다</p>
         </div>
 
         <form class="search-form" id="searchForm">
@@ -646,12 +646,12 @@
                             <label for="selectAllVideoLength">모두 선택</label>
                         </div>
                         <div class="select-group-container">
-                            <input type="checkbox" id="selectTop5VideoLength">
-                            <label for="selectTop5VideoLength">위 5개 선택</label>
+                            <input type="checkbox" id="selectFirst2VideoLength">
+                            <label for="selectFirst2VideoLength">맨 앞 두 개만</label>
                         </div>
                         <div class="select-group-container">
-                            <input type="checkbox" id="selectBottom5VideoLength">
-                            <label for="selectBottom5VideoLength">밑 5개 선택</label>
+                            <input type="checkbox" id="selectNext3VideoLength">
+                            <label for="selectNext3VideoLength">그 뒤 세 개만</label>
                         </div>
                     </div>
                 </div>
@@ -807,12 +807,12 @@
             updateGroupCheckboxes();
         });
 
-        // 동영상 길이 "위 5개 선택" 체크박스 이벤트
-        document.getElementById('selectTop5VideoLength').addEventListener('change', (e) => {
+        // 동영상 길이 "맨 앞 두 개만" 체크박스 이벤트
+        document.getElementById('selectFirst2VideoLength').addEventListener('change', (e) => {
             const isChecked = e.target.checked;
-            const top5Checkboxes = ['shortForm1', 'shortForm2', 'midForm1', 'midForm2', 'longForm1'];
+            const first2Checkboxes = ['shortForm1', 'shortForm2'];
             
-            top5Checkboxes.forEach(id => {
+            first2Checkboxes.forEach(id => {
                 const checkbox = document.getElementById(id);
                 if (checkbox) {
                     checkbox.checked = isChecked;
@@ -823,12 +823,12 @@
             updateGroupCheckboxes();
         });
 
-        // 동영상 길이 "밑 5개 선택" 체크박스 이벤트
-        document.getElementById('selectBottom5VideoLength').addEventListener('change', (e) => {
+        // 동영상 길이 "그 뒤 세 개만" 체크박스 이벤트
+        document.getElementById('selectNext3VideoLength').addEventListener('change', (e) => {
             const isChecked = e.target.checked;
-            const bottom5Checkboxes = ['longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'];
+            const next3Checkboxes = ['midForm1', 'midForm2', 'longForm1'];
             
-            bottom5Checkboxes.forEach(id => {
+            next3Checkboxes.forEach(id => {
                 const checkbox = document.getElementById(id);
                 if (checkbox) {
                     checkbox.checked = isChecked;
@@ -866,43 +866,43 @@
 
         // 그룹 체크박스 상태 업데이트
         function updateGroupCheckboxes() {
-            const top5Checkboxes = ['shortForm1', 'shortForm2', 'midForm1', 'midForm2', 'longForm1'];
-            const bottom5Checkboxes = ['longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'];
+            const first2Checkboxes = ['shortForm1', 'shortForm2'];
+            const next3Checkboxes = ['midForm1', 'midForm2', 'longForm1'];
             
-            // 위 5개 체크박스 상태 확인
-            const top5CheckedCount = top5Checkboxes.filter(id => {
+            // 맨 앞 두 개 체크박스 상태 확인
+            const first2CheckedCount = first2Checkboxes.filter(id => {
                 const checkbox = document.getElementById(id);
                 return checkbox && checkbox.checked;
             }).length;
             
-            const selectTop5Checkbox = document.getElementById('selectTop5VideoLength');
-            if (top5CheckedCount === 0) {
-                selectTop5Checkbox.checked = false;
-                selectTop5Checkbox.indeterminate = false;
-            } else if (top5CheckedCount === top5Checkboxes.length) {
-                selectTop5Checkbox.checked = true;
-                selectTop5Checkbox.indeterminate = false;
+            const selectFirst2Checkbox = document.getElementById('selectFirst2VideoLength');
+            if (first2CheckedCount === 0) {
+                selectFirst2Checkbox.checked = false;
+                selectFirst2Checkbox.indeterminate = false;
+            } else if (first2CheckedCount === first2Checkboxes.length) {
+                selectFirst2Checkbox.checked = true;
+                selectFirst2Checkbox.indeterminate = false;
             } else {
-                selectTop5Checkbox.checked = false;
-                selectTop5Checkbox.indeterminate = true;
+                selectFirst2Checkbox.checked = false;
+                selectFirst2Checkbox.indeterminate = true;
             }
             
-            // 밑 5개 체크박스 상태 확인
-            const bottom5CheckedCount = bottom5Checkboxes.filter(id => {
+            // 그 뒤 세 개 체크박스 상태 확인
+            const next3CheckedCount = next3Checkboxes.filter(id => {
                 const checkbox = document.getElementById(id);
                 return checkbox && checkbox.checked;
             }).length;
             
-            const selectBottom5Checkbox = document.getElementById('selectBottom5VideoLength');
-            if (bottom5CheckedCount === 0) {
-                selectBottom5Checkbox.checked = false;
-                selectBottom5Checkbox.indeterminate = false;
-            } else if (bottom5CheckedCount === bottom5Checkboxes.length) {
-                selectBottom5Checkbox.checked = true;
-                selectBottom5Checkbox.indeterminate = false;
+            const selectNext3Checkbox = document.getElementById('selectNext3VideoLength');
+            if (next3CheckedCount === 0) {
+                selectNext3Checkbox.checked = false;
+                selectNext3Checkbox.indeterminate = false;
+            } else if (next3CheckedCount === next3Checkboxes.length) {
+                selectNext3Checkbox.checked = true;
+                selectNext3Checkbox.indeterminate = false;
             } else {
-                selectBottom5Checkbox.checked = false;
-                selectBottom5Checkbox.indeterminate = true;
+                selectNext3Checkbox.checked = false;
+                selectNext3Checkbox.indeterminate = true;
             }
         }
 
