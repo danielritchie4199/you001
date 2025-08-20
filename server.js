@@ -487,22 +487,26 @@ app.get('/api/search', async (req, res) => {
          
          if (!matchesVideoLength(videoLengthCategory, selectedVideoLengths)) continue;
 
-         const result = {
-           youtube_channel_name: video.snippet.channelTitle,
-           thumbnail_url: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url,
-           status: 'active',
-           youtube_channel_id: video.snippet.channelId,
-           primary_category: await getCategoryName(video.snippet.categoryId),
-           status_date: video.snippet.publishedAt,
-           daily_view_count: viewCount,
-           vod_url: `https://www.youtube.com/watch?v=${video.id}`,
-           video_id: video.id,
-           title: video.snippet.title,
-           description: video.snippet.description,
-           duration: video.contentDetails.duration,
-           duration_seconds: durationInSeconds,
-           video_length_category: videoLengthCategory
-         };
+                 // 채널 구독자 수 정보 가져오기
+        const subscriberCount = await getChannelSubscriberCount(video.snippet.channelId);
+
+        const result = {
+          youtube_channel_name: video.snippet.channelTitle,
+          thumbnail_url: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url,
+          status: 'active',
+          youtube_channel_id: video.snippet.channelId,
+          primary_category: await getCategoryName(video.snippet.categoryId),
+          status_date: video.snippet.publishedAt,
+          daily_view_count: viewCount,
+          subscriber_count: subscriberCount,
+          vod_url: `https://www.youtube.com/watch?v=${video.id}`,
+          video_id: video.id,
+          title: video.snippet.title,
+          description: video.snippet.description,
+          duration: video.contentDetails.duration,
+          duration_seconds: durationInSeconds,
+          video_length_category: videoLengthCategory
+        };
 
          // 중복 제거 후 결과 추가
          searchResults.push(result);
@@ -623,11 +627,12 @@ app.post('/api/download-excel', async (req, res) => {
         '카테고리': result.primary_category || '',
         '업로드일': result.status_date ? new Date(result.status_date).toLocaleDateString('ko-KR') : '',
         '조회수': parseInt(result.daily_view_count || 0).toLocaleString(),
+        '구독자': formatSubscriberCountForExcel(result.subscriber_count || 0),
+        'URL': result.vod_url || '',
         '시간(초)': result.duration_seconds || 0,
         '시간(형식)': formatDurationForExcel(result.duration_seconds),
         '동영상 길이': formatVideoLengthForExcel(result.video_length_category) || '',
         '상태': result.status || '',
-        'URL': result.vod_url || '',
         '썸네일 URL': result.thumbnail_url || ''
       };
     });
@@ -645,11 +650,12 @@ app.post('/api/download-excel', async (req, res) => {
       { wch: 15 }, // 카테고리
       { wch: 12 }, // 업로드일
       { wch: 12 }, // 조회수
+      { wch: 12 }, // 구독자
+      { wch: 50 }, // URL
       { wch: 8 },  // 시간(초)
       { wch: 10 }, // 시간(형식)
       { wch: 12 }, // 동영상 길이
       { wch: 10 }, // 상태
-      { wch: 50 }, // URL
       { wch: 50 }  // 썸네일 URL
     ];
     worksheet['!cols'] = columnWidths;
@@ -700,6 +706,27 @@ function formatDurationForExcel(durationSeconds) {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   } else {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+}
+
+// Excel용 구독자 수 포맷 함수 (만 단위)
+function formatSubscriberCountForExcel(count) {
+  if (!count || count === 0) {
+    return '0';
+  }
+  
+  const number = parseInt(count);
+  const inTenThousands = number / 10000;
+  
+  if (number < 10000) {
+    // 1만 미만인 경우 소수점 표시
+    return inTenThousands.toFixed(2);
+  } else if (number < 100000) {
+    // 1만 이상 10만 미만인 경우 소수점 1자리
+    return inTenThousands.toFixed(1);
+  } else {
+    // 10만 이상인 경우 정수로 표시
+    return Math.round(inTenThousands).toString();
   }
 }
 
@@ -860,6 +887,27 @@ function getVideoLengthCategory(durationInSeconds) {
 function matchesVideoLength(videoLengthCategory, selectedLengths) {
   if (!selectedLengths || selectedLengths.length === 0) return true;
   return selectedLengths.includes(videoLengthCategory);
+}
+
+// 채널 구독자 수 가져오기
+async function getChannelSubscriberCount(channelId) {
+  try {
+    const youtube = apiKeyManager.getYouTubeInstance();
+    const channelResponse = await youtube.channels.list({
+      part: 'statistics',
+      id: channelId
+    });
+
+    if (channelResponse.data.items && channelResponse.data.items.length > 0) {
+      const subscriberCount = channelResponse.data.items[0].statistics.subscriberCount;
+      return parseInt(subscriberCount) || 0;
+    }
+    
+    return 0;
+  } catch (error) {
+    console.error(`채널 구독자 수 조회 오류 (${channelId}):`, error.message);
+    return 0;
+  }
 }
 
 async function getCategoryName(categoryId) {

@@ -369,6 +369,11 @@
             color: #28a745;
         }
 
+        .subscriber-count {
+            font-weight: 600;
+            color: #dc3545;
+        }
+
         .duration-time {
             font-family: 'Courier New', monospace;
             font-weight: 600;
@@ -686,6 +691,7 @@
                             <th data-sort="primary_category" class="sortable">카테고리</th>
                             <th data-sort="status_date" class="sortable">업로드일</th>
                             <th data-sort="daily_view_count" class="sortable">조회수</th>
+                            <th data-sort="subscriber_count" class="sortable">구독(만)</th>
                             <th data-sort="vod_url">URL</th>
                             <th data-sort="duration" class="sortable">시간</th>
                             <th>다운로드</th>
@@ -861,7 +867,7 @@
                 let bVal = b[sortColumn];
 
                 // 숫자 값 처리
-                if (sortColumn === 'daily_view_count') {
+                if (sortColumn === 'daily_view_count' || sortColumn === 'subscriber_count') {
                     aVal = parseInt(aVal) || 0;
                     bVal = parseInt(bVal) || 0;
                 }
@@ -904,7 +910,7 @@
             if (pageResults.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="no-results">
+                        <td colspan="11" class="no-results">
                             <h3>검색 결과가 없습니다</h3>
                             <p>다른 검색 조건으로 시도해보세요.</p>
                         </td>
@@ -918,6 +924,7 @@
                 
                 const uploadDate = new Date(result.status_date).toLocaleDateString('ko-KR');
                 const viewCount = parseInt(result.daily_view_count).toLocaleString();
+                const subscriberCount = formatSubscriberCount(result.subscriber_count || 0);
                 const formattedDuration = formatDuration(result.duration_seconds);
                 
                 row.innerHTML = `
@@ -935,6 +942,9 @@
                     <td>${uploadDate}</td>
                     <td>
                         <span class="view-count">${viewCount}</span>
+                    </td>
+                    <td>
+                        <span class="subscriber-count">${subscriberCount}</span>
                     </td>
                     <td>
                         <a href="${result.vod_url}" target="_blank" class="video-link">
@@ -1374,6 +1384,27 @@
             document.body.removeChild(a);
             
             console.log(`📁 Excel 파일이 기본 다운로드 폴더에 저장됩니다: ${filename}`);
+        }
+
+        // 구독자 수를 만 단위로 변환하는 함수
+        function formatSubscriberCount(count) {
+            if (!count || count === 0) {
+                return '0';
+            }
+            
+            const number = parseInt(count);
+            const inTenThousands = number / 10000;
+            
+            if (number < 10000) {
+                // 1만 미만인 경우 소수점 표시
+                return inTenThousands.toFixed(2);
+            } else if (number < 100000) {
+                // 1만 이상 10만 미만인 경우 소수점 1자리
+                return inTenThousands.toFixed(1);
+            } else {
+                // 10만 이상인 경우 정수로 표시
+                return Math.round(inTenThousands).toString();
+            }
         }
 
         // 동영상 재생시간을 HH:MM:SS 형식으로 변환하는 함수
