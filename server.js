@@ -160,6 +160,8 @@ app.get('/api/search', async (req, res) => {
       maxViews,
       minViews = 100000,
       uploadPeriod,
+      startDate,
+      endDate,
       videoLength,
       maxResults = 60   // 기본값 60건
     } = req.query;
@@ -287,11 +289,47 @@ app.get('/api/search', async (req, res) => {
       }
     }
 
-    // 업로드 기간 설정
+    // 업로드 기간 설정 (기존 드롭다운 방식)
     if (uploadPeriod) {
       const { publishedAfter, publishedBefore } = getDateRange(uploadPeriod);
       if (publishedAfter) searchParams.publishedAfter = publishedAfter;
       if (publishedBefore) searchParams.publishedBefore = publishedBefore;
+    }
+
+    // 커스텀 날짜 범위 설정 (startDate, endDate가 있으면 uploadPeriod보다 우선)
+    if (startDate || endDate) {
+      if (startDate) {
+        try {
+          const startDateTime = new Date(startDate + 'T00:00:00');
+          if (isNaN(startDateTime.getTime())) {
+            throw new Error('Invalid start date');
+          }
+          searchParams.publishedAfter = startDateTime.toISOString();
+          console.log('✅ 시작일 설정 성공:', startDateTime.toISOString());
+        } catch (error) {
+          console.error('❌ 시작일 처리 오류:', error.message, '입력값:', startDate);
+          // 오류 시 시작일 무시하고 계속 진행
+        }
+      }
+      if (endDate) {
+        try {
+          const endDateTime = new Date(endDate + 'T23:59:59');
+          if (isNaN(endDateTime.getTime())) {
+            throw new Error('Invalid end date');
+          }
+          searchParams.publishedBefore = endDateTime.toISOString();
+          console.log('✅ 종료일 설정 성공:', endDateTime.toISOString());
+        } catch (error) {
+          console.error('❌ 종료일 처리 오류:', error.message, '입력값:', endDate);
+          // 오류 시 종료일 무시하고 계속 진행
+        }
+      }
+      console.log('📅 커스텀 날짜 범위 적용:', {
+        startDate: startDate || '없음',
+        endDate: endDate || '없음',
+        publishedAfter: searchParams.publishedAfter || '없음',
+        publishedBefore: searchParams.publishedBefore || '없음'
+      });
     }
 
     // 동영상 길이 설정 (YouTube API는 'short', 'medium', 'long'만 지원하므로 후처리에서 필터링)
@@ -679,7 +717,24 @@ app.post('/api/download-excel', async (req, res) => {
     const keyword = searchParams?.keyword || '전체';
     const country = searchParams?.country || 'worldwide';
     const resultCount = searchResults.length;
-    const filename = `YouTube_${keyword}_${country}_[${resultCount}]_${timestamp}.xlsx`;
+    
+    // 날짜 범위 정보 포함
+    let dateRangeStr = '';
+    if (searchParams?.startDate || searchParams?.endDate) {
+      const startDateStr = searchParams?.startDate ? searchParams.startDate.replace(/-/g, '') : '';
+      const endDateStr = searchParams?.endDate ? searchParams.endDate.replace(/-/g, '') : '';
+      if (startDateStr && endDateStr) {
+        dateRangeStr = `_${startDateStr}-${endDateStr}`;
+      } else if (startDateStr) {
+        dateRangeStr = `_${startDateStr}이후`;
+      } else if (endDateStr) {
+        dateRangeStr = `_${endDateStr}이전`;
+      }
+    } else if (searchParams?.uploadPeriod) {
+      dateRangeStr = `_${searchParams.uploadPeriod}`;
+    }
+    
+    const filename = `YouTube_${keyword}_${country}${dateRangeStr}_[${resultCount}]_${timestamp}.xlsx`;
 
     // 응답 헤더 설정
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
