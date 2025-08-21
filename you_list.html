@@ -631,6 +631,15 @@
                         <option value="3months">3개월</option>
                         <option value="6months">6개월</option>
                         <option value="1year">1년</option>
+                        <option value="2years">2년</option>
+                        <option value="3years">3년</option>
+                        <option value="4years">4년</option>
+                        <option value="5years">5년</option>
+                        <option value="6years">6년</option>
+                        <option value="7years">7년</option>
+                        <option value="8years">8년</option>
+                        <option value="9years">9년</option>
+                        <option value="10years">10년</option>
                     </select>
                 </div>
 
@@ -652,6 +661,14 @@
                         <div class="select-group-container">
                             <input type="checkbox" id="selectNext3VideoLength">
                             <label for="selectNext3VideoLength">그 뒤 세 개만</label>
+                        </div>
+                        <div class="select-group-container">
+                            <input type="checkbox" id="selectTop5VideoLength">
+                            <label for="selectTop5VideoLength">위 5개 선택</label>
+                        </div>
+                        <div class="select-group-container">
+                            <input type="checkbox" id="selectBottom5VideoLength">
+                            <label for="selectBottom5VideoLength">밑 5개 선택</label>
                         </div>
                     </div>
                 </div>
@@ -839,6 +856,38 @@
             updateGroupCheckboxes();
         });
 
+        // 동영상 길이 "위 5개 선택" 체크박스 이벤트
+        document.getElementById('selectTop5VideoLength').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const top5Checkboxes = ['shortForm1', 'shortForm2', 'midForm1', 'midForm2', 'longForm1'];
+            
+            top5Checkboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.checked = isChecked;
+                }
+            });
+            
+            updateSelectAllVideoLength();
+            updateGroupCheckboxes();
+        });
+
+        // 동영상 길이 "밑 5개 선택" 체크박스 이벤트
+        document.getElementById('selectBottom5VideoLength').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const bottom5Checkboxes = ['longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'];
+            
+            bottom5Checkboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.checked = isChecked;
+                }
+            });
+            
+            updateSelectAllVideoLength();
+            updateGroupCheckboxes();
+        });
+
         // 개별 동영상 길이 체크박스 변경 시 "모두 선택" 상태 업데이트
         function updateSelectAllVideoLength() {
             const videoLengthCheckboxes = [
@@ -868,6 +917,8 @@
         function updateGroupCheckboxes() {
             const first2Checkboxes = ['shortForm1', 'shortForm2'];
             const next3Checkboxes = ['midForm1', 'midForm2', 'longForm1'];
+            const top5Checkboxes = ['shortForm1', 'shortForm2', 'midForm1', 'midForm2', 'longForm1'];
+            const bottom5Checkboxes = ['longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'];
             
             // 맨 앞 두 개 체크박스 상태 확인
             const first2CheckedCount = first2Checkboxes.filter(id => {
@@ -903,6 +954,42 @@
             } else {
                 selectNext3Checkbox.checked = false;
                 selectNext3Checkbox.indeterminate = true;
+            }
+            
+            // 위 5개 체크박스 상태 확인
+            const top5CheckedCount = top5Checkboxes.filter(id => {
+                const checkbox = document.getElementById(id);
+                return checkbox && checkbox.checked;
+            }).length;
+            
+            const selectTop5Checkbox = document.getElementById('selectTop5VideoLength');
+            if (top5CheckedCount === 0) {
+                selectTop5Checkbox.checked = false;
+                selectTop5Checkbox.indeterminate = false;
+            } else if (top5CheckedCount === top5Checkboxes.length) {
+                selectTop5Checkbox.checked = true;
+                selectTop5Checkbox.indeterminate = false;
+            } else {
+                selectTop5Checkbox.checked = false;
+                selectTop5Checkbox.indeterminate = true;
+            }
+            
+            // 밑 5개 체크박스 상태 확인
+            const bottom5CheckedCount = bottom5Checkboxes.filter(id => {
+                const checkbox = document.getElementById(id);
+                return checkbox && checkbox.checked;
+            }).length;
+            
+            const selectBottom5Checkbox = document.getElementById('selectBottom5VideoLength');
+            if (bottom5CheckedCount === 0) {
+                selectBottom5Checkbox.checked = false;
+                selectBottom5Checkbox.indeterminate = false;
+            } else if (bottom5CheckedCount === bottom5Checkboxes.length) {
+                selectBottom5Checkbox.checked = true;
+                selectBottom5Checkbox.indeterminate = false;
+            } else {
+                selectBottom5Checkbox.checked = false;
+                selectBottom5Checkbox.indeterminate = true;
             }
         }
 
@@ -964,9 +1051,14 @@
             if (longForm5) selectedLengths.push('long5');
             if (longForm6) selectedLengths.push('long6');
             
-            if (selectedLengths.length > 0) {
-                searchParams.append('videoLength', selectedLengths.join(','));
-            }
+            // 동영상 길이 파라미터 (빈 배열이어도 전송)
+            console.log('🎬 동영상 길이 디버그:', {
+                selectedLengths: selectedLengths,
+                lengthCount: selectedLengths.length,
+                joinedString: selectedLengths.join(','),
+                willSend: selectedLengths.join(',') || '빈 문자열'
+            });
+            searchParams.append('videoLength', selectedLengths.join(','));
 
             // 키워드 확인 및 안내 메시지
             const keyword = document.getElementById('keyword').value;

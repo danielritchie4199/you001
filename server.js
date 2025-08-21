@@ -174,8 +174,8 @@ app.get('/api/search', async (req, res) => {
     console.log(`검색 결과 수: ${finalMaxResults}건 (요청: ${maxResults})`);
 
     // 동영상 길이 파라미터 파싱
-    const selectedVideoLengths = videoLength ? videoLength.split(',') : [];
-    console.log('선택된 동영상 길이:', selectedVideoLengths);
+    const selectedVideoLengths = videoLength && videoLength.trim() ? videoLength.split(',').filter(v => v.trim()) : [];
+    console.log('선택된 동영상 길이:', selectedVideoLengths.length > 0 ? selectedVideoLengths : '모든 길이 허용 (필터 없음)');
 
     let searchResults = [];
     let nextPageToken = '';
@@ -851,6 +851,33 @@ function getDateRange(period) {
       break;
     case '1year':
       publishedAfter = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '2years':
+      publishedAfter = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '3years':
+      publishedAfter = new Date(now.getTime() - 3 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '4years':
+      publishedAfter = new Date(now.getTime() - 4 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '5years':
+      publishedAfter = new Date(now.getTime() - 5 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '6years':
+      publishedAfter = new Date(now.getTime() - 6 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '7years':
+      publishedAfter = new Date(now.getTime() - 7 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '8years':
+      publishedAfter = new Date(now.getTime() - 8 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '9years':
+      publishedAfter = new Date(now.getTime() - 9 * 365 * 24 * 60 * 60 * 1000);
+      break;
+    case '10years':
+      publishedAfter = new Date(now.getTime() - 10 * 365 * 24 * 60 * 60 * 1000);
       break;
   }
   
