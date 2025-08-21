@@ -1,0 +1,33 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "normalizer": {
+        "lowercase_norm": {
+          "type": "custom",
+          "char_filter": [],
+          "filter": ["lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "video_id": {"type": "keyword"},
+      "title": {"type": "text", "fields": {"raw": {"type": "keyword"}}},
+      "youtube_channel_name": {"type": "text", "fields": {"raw": {"type": "keyword"}}},
+      "youtube_channel_id": {"type": "keyword"},
+      "country": {"type": "keyword"},
+      "status_date": {"type": "date"},
+      "daily_view_count": {"type": "long"},
+      "subscriber_count": {"type": "long"},
+      "duration_seconds": {"type": "integer"},
+      "video_length_category": {"type": "keyword"},
+      "primary_category": {"type": "keyword"},
+      "vod_url": {"type": "keyword"},
+      "keyword_normalized": {"type": "keyword", "normalizer": "lowercase_norm"},
+      "indexed_at": {"type": "date"}
+    }
+  }
+}

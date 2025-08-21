@@ -4,7 +4,18 @@ const path = require('path');
 const { google } = require('googleapis');
 const axios = require('axios');
 const XLSX = require('xlsx');
+const { Client } = require('@elastic/elasticsearch');
 require('dotenv').config();
+
+// Elasticsearch 클라이언트 설정
+let esClient = null;
+try {
+  esClient = new Client({ node: process.env.ES_NODE || 'http://localhost:9200' });
+  console.log('Elasticsearch 클라이언트 초기화 완료');
+} catch (error) {
+  console.warn('Elasticsearch 연결 실패, YouTube API만 사용:', error.message);
+  esClient = null;
+}
 
 // 다중 API 키 관리 시스템
 class ApiKeyManager {
@@ -28,7 +39,8 @@ class ApiKeyManager {
           name: `API_KEY_${i}`,
           usageCount: 0,
           quotaExceeded: false,
-          lastUsed: null
+          lastUsed: null,
+          consecutiveErrors: 0  // 연속 오류 횟수 추가
         });
         this.keyUsageCount[i] = 0;
         this.keyQuotaExceeded[i] = false;
@@ -50,27 +62,41 @@ class ApiKeyManager {
     });
   }
   
-  // 현재 사용 가능한 API 키 반환
+  // 현재 사용 가능한 API 키 반환 - 개선된 로직
   getCurrentKey() {
-    // 할당량 초과되지 않은 키 찾기
-    let availableKey = this.apiKeys.find(keyInfo => !keyInfo.quotaExceeded);
+    // 할당량 초과되지 않은 키 찾기 (연속 오류가 많지 않은 키 우선)
+    let availableKeys = this.apiKeys.filter(keyInfo => 
+      !keyInfo.quotaExceeded && keyInfo.consecutiveErrors < 3
+    );
     
-    if (!availableKey) {
-      console.log('⚠️ 모든 API 키의 할당량이 초과되었습니다. 첫 번째 키로 재시도합니다.');
-      // 모든 키가 초과된 경우 첫 번째 키 사용 (다음 날까지 대기)
-      availableKey = this.apiKeys[0];
-    } else {
-      // 사용 가능한 키가 있으면 현재 인덱스 업데이트
-      this.currentKeyIndex = availableKey.index - 1;
-      console.log(`🔑 현재 사용 가능한 키: ${availableKey.name} (인덱스: ${this.currentKeyIndex + 1})`);
+    // 사용 가능한 키가 없으면 연속 오류 조건을 완화
+    if (availableKeys.length === 0) {
+      availableKeys = this.apiKeys.filter(keyInfo => !keyInfo.quotaExceeded);
     }
     
-    return availableKey;
+    if (availableKeys.length === 0) {
+      console.log('⚠️ 모든 API 키의 할당량이 초과되었습니다. 다음 날까지 대기해야 합니다.');
+      return null;
+    }
+    
+    // 사용 횟수가 가장 적은 키를 선택
+    availableKeys.sort((a, b) => a.usageCount - b.usageCount);
+    const selectedKey = availableKeys[0];
+    
+    // 현재 인덱스 업데이트
+    this.currentKeyIndex = selectedKey.index - 1;
+    console.log(`🔑 선택된 API 키: ${selectedKey.name} (사용횟수: ${selectedKey.usageCount}, 연속오류: ${selectedKey.consecutiveErrors})`);
+    
+    return selectedKey;
   }
   
   // 현재 YouTube API 인스턴스 반환
   getYouTubeInstance() {
     const currentKey = this.getCurrentKey();
+    if (!currentKey) {
+      throw new Error('NO_AVAILABLE_KEYS: 사용 가능한 API 키가 없습니다.');
+    }
+    
     currentKey.usageCount++;
     currentKey.lastUsed = new Date();
     
@@ -79,27 +105,74 @@ class ApiKeyManager {
     return google.youtube({ version: 'v3', auth: currentKey.key });
   }
   
-  // 할당량 초과 처리
-  markKeyAsQuotaExceeded(currentKey) {
-    if (currentKey) {
+  // 할당량 초과 처리 - 개선된 로직
+  markKeyAsQuotaExceeded(currentKey, errorMessage = '') {
+    if (!currentKey) return null;
+    
+    console.log(`❌ ${currentKey.name} 오류 발생: ${errorMessage}`);
+    
+    // 할당량 관련 오류인지 확인
+    if (errorMessage.includes('quota') || errorMessage.includes('quotaExceeded') || 
+        errorMessage.includes('dailyLimitExceeded') || errorMessage.includes('rateLimitExceeded')) {
       currentKey.quotaExceeded = true;
-      console.log(`❌ ${currentKey.name} 할당량 초과로 비활성화됨`);
+      console.log(`🚫 ${currentKey.name} 할당량 초과로 비활성화됨`);
+    } else {
+      // 다른 오류의 경우 연속 오류 횟수 증가
+      currentKey.consecutiveErrors++;
+      console.log(`⚠️ ${currentKey.name} 연속 오류 횟수: ${currentKey.consecutiveErrors}`);
       
-      // 다음 사용 가능한 키 찾기 (현재 키 제외)
-      const nextKey = this.apiKeys.find(keyInfo => 
-        keyInfo.index !== currentKey.index && !keyInfo.quotaExceeded
-      );
-      
-      if (nextKey) {
-        console.log(`🔄 ${nextKey.name}으로 전환합니다.`);
-        // 현재 키 인덱스 업데이트
-        this.currentKeyIndex = nextKey.index - 1;
-        return nextKey; // 전환된 키 반환
-      } else {
-        console.log('⚠️ 사용 가능한 API 키가 없습니다.');
-        return null; // 전환 실패
+      // 연속 오류가 3회 이상이면 임시 비활성화
+      if (currentKey.consecutiveErrors >= 3) {
+        console.log(`🔒 ${currentKey.name} 연속 오류로 임시 비활성화 (할당량 초과는 아님)`);
       }
     }
+    
+    // 다음 사용 가능한 키 찾기
+    const nextKey = this.getCurrentKey();
+    
+    if (nextKey) {
+      console.log(`🔄 ${nextKey.name}으로 전환합니다.`);
+      return nextKey;
+    } else {
+      console.log('⚠️ 사용 가능한 API 키가 없습니다.');
+      return null;
+    }
+  }
+  
+  // API 호출 성공 시 연속 오류 카운터 리셋
+  markKeyAsSuccessful(currentKey) {
+    if (currentKey && currentKey.consecutiveErrors > 0) {
+      console.log(`✅ ${currentKey.name} 성공, 연속 오류 카운터 리셋`);
+      currentKey.consecutiveErrors = 0;
+    }
+  }
+  
+  // 사용 가능한 키가 있는지 확인
+  hasAvailableKeys() {
+    return this.apiKeys.some(keyInfo => !keyInfo.quotaExceeded);
+  }
+  
+  // 할당량 초과 처리를 포함한 안전한 YouTube 인스턴스 반환
+  async getYouTubeInstanceSafely() {
+    const maxRetries = this.apiKeys.length;
+    let currentRetry = 0;
+    
+    while (currentRetry < maxRetries) {
+      const currentKey = this.getCurrentKey();
+      
+      if (!currentKey || currentKey.quotaExceeded) {
+        console.log('사용 가능한 API 키가 없음');
+        return null;
+      }
+      
+      currentKey.usageCount++;
+      currentKey.lastUsed = new Date();
+      console.log(`🔑 사용 중인 API 키: ${currentKey.name} (사용횟수: ${currentKey.usageCount})`);
+      
+      const youtube = google.youtube({ version: 'v3', auth: currentKey.key });
+      return { youtube, currentKey };
+    }
+    
     return null;
   }
   
@@ -135,6 +208,227 @@ class ApiKeyManager {
 
 // API 키 매니저 인스턴스 생성
 const apiKeyManager = new ApiKeyManager();
+
+// Elasticsearch 헬퍼 함수들
+class ElasticsearchHelper {
+  constructor(client) {
+    this.client = client;
+    this.indexName = process.env.ES_INDEX_VIDEOS || 'videos';
+    this.ttlHours = parseInt(process.env.ES_TTL_HOURS) || 48;
+  }
+
+  // 캐시 히트 판단
+  async checkCacheHit(searchParams) {
+    if (!this.client) return { hit: false, reason: 'ES client not available' };
+    
+    try {
+      const { country, keyword, minViews, maxViews, maxResults } = searchParams;
+      
+      // 검색 조건 구성
+      const mustQueries = [];
+      const filterQueries = [];
+      
+      if (country && country !== 'worldwide') {
+        mustQueries.push({ term: { country } });
+      }
+      
+      if (keyword && keyword.trim()) {
+        mustQueries.push({ term: { keyword_normalized: keyword.toLowerCase() } });
+      }
+      
+      if (minViews) {
+        filterQueries.push({ range: { daily_view_count: { gte: parseInt(minViews) } } });
+      }
+      
+      if (maxViews) {
+        filterQueries.push({ range: { daily_view_count: { lte: parseInt(maxViews) } } });
+      }
+      
+      // 캐시된 데이터 수량 확인
+      const countQuery = {
+        query: {
+          bool: {
+            must: mustQueries,
+            filter: filterQueries
+          }
+        }
+      };
+      
+      const countResponse = await this.client.count({
+        index: this.indexName,
+        body: countQuery
+      });
+      
+      const availableCount = countResponse.body.count;
+      const requestedCount = parseInt(maxResults) || 60;
+      
+      // 신선도 확인
+      const freshnessQuery = {
+        query: { bool: { must: mustQueries, filter: filterQueries } },
+        sort: [{ indexed_at: 'desc' }],
+        size: 1,
+        _source: ['indexed_at']
+      };
+      
+      const freshnessResponse = await this.client.search({
+        index: this.indexName,
+        body: freshnessQuery
+      });
+      
+      const hits = freshnessResponse.body.hits.hits;
+      let isFresh = false;
+      
+      if (hits.length > 0) {
+        const lastIndexed = new Date(hits[0]._source.indexed_at);
+        const ttlLimit = new Date(Date.now() - this.ttlHours * 60 * 60 * 1000);
+        isFresh = lastIndexed > ttlLimit;
+      }
+      
+      const cacheHit = availableCount >= requestedCount && isFresh;
+      
+      return {
+        hit: cacheHit,
+        availableCount,
+        requestedCount,
+        isFresh,
+        reason: cacheHit ? 'Cache hit' : `Insufficient data (${availableCount}/${requestedCount}) or stale data (fresh: ${isFresh})`
+      };
+      
+    } catch (error) {
+      console.error('Cache hit check error:', error);
+      return { hit: false, reason: 'Cache check failed', error: error.message };
+    }
+  }
+  
+  // ES에서 검색 결과 조회
+  async searchVideos(searchParams) {
+    if (!this.client) return null;
+    
+    try {
+      const { country, keyword, minViews, maxViews, maxResults } = searchParams;
+      
+      // 검색 조건 구성
+      const mustQueries = [];
+      const filterQueries = [];
+      
+      if (country && country !== 'worldwide') {
+        mustQueries.push({ term: { country } });
+      }
+      
+      if (keyword && keyword.trim()) {
+        mustQueries.push({ term: { keyword_normalized: keyword.toLowerCase() } });
+      }
+      
+      if (minViews) {
+        filterQueries.push({ range: { daily_view_count: { gte: parseInt(minViews) } } });
+      }
+      
+      if (maxViews) {
+        filterQueries.push({ range: { daily_view_count: { lte: parseInt(maxViews) } } });
+      }
+      
+      const searchQuery = {
+        query: {
+          bool: {
+            must: mustQueries,
+            filter: filterQueries
+          }
+        },
+        sort: [{ daily_view_count: 'desc' }],
+        size: parseInt(maxResults) || 60
+      };
+      
+      const response = await this.client.search({
+        index: this.indexName,
+        body: searchQuery
+      });
+      
+      // ES 결과를 API 응답 형식으로 변환
+      const results = response.body.hits.hits.map(hit => ({
+        youtube_channel_name: hit._source.youtube_channel_name,
+        thumbnail_url: hit._source.thumbnail_url,
+        status: hit._source.status || 'active',
+        youtube_channel_id: hit._source.youtube_channel_id,
+        primary_category: hit._source.primary_category,
+        status_date: hit._source.status_date,
+        daily_view_count: hit._source.daily_view_count,
+        subscriber_count: hit._source.subscriber_count,
+        vod_url: hit._source.vod_url,
+        video_id: hit._source.video_id,
+        title: hit._source.title,
+        description: hit._source.description,
+        duration: hit._source.duration,
+        duration_seconds: hit._source.duration_seconds,
+        video_length_category: hit._source.video_length_category
+      }));
+      
+      return results;
+      
+    } catch (error) {
+      console.error('ES search error:', error);
+      return null;
+    }
+  }
+  
+  // YouTube API 결과를 ES에 bulk upsert
+  async bulkUpsertVideos(videos, searchParams) {
+    if (!this.client || !videos || videos.length === 0) return;
+    
+    try {
+      const body = [];
+      const indexedAt = new Date().toISOString();
+      
+      videos.forEach(video => {
+        // upsert를 위한 update 액션
+        body.push({
+          update: {
+            _index: this.indexName,
+            _id: video.video_id
+          }
+        });
+        
+        // 문서 내용
+        body.push({
+          doc: {
+            video_id: video.video_id,
+            title: video.title,
+            youtube_channel_name: video.youtube_channel_name,
+            youtube_channel_id: video.youtube_channel_id,
+            country: searchParams.country || 'unknown',
+            status_date: video.status_date,
+            daily_view_count: parseInt(video.daily_view_count) || 0,
+            subscriber_count: parseInt(video.subscriber_count) || 0,
+            duration_seconds: parseInt(video.duration_seconds) || 0,
+            video_length_category: video.video_length_category,
+            primary_category: video.primary_category,
+            vod_url: video.vod_url,
+            thumbnail_url: video.thumbnail_url,
+            status: video.status || 'active',
+            description: video.description || '',
+            duration: video.duration || '',
+            keyword_normalized: (searchParams.keyword || '').toLowerCase(),
+            indexed_at: indexedAt
+          },
+          doc_as_upsert: true
+        });
+      });
+      
+      const response = await this.client.bulk({ body });
+      
+      if (response.body.errors) {
+        console.error('ES bulk upsert errors:', response.body.items.filter(item => item.update && item.update.error));
+      } else {
+        console.log(`ES bulk upsert 성공: ${videos.length}개 비디오 인덱싱`);
+      }
+      
+    } catch (error) {
+      console.error('ES bulk upsert error:', error);
+    }
+  }
+}
+
+// ES 헬퍼 인스턴스 생성
+const esHelper = new ElasticsearchHelper(esClient);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -178,6 +472,46 @@ app.get('/api/search', async (req, res) => {
     // 동영상 길이 파라미터 파싱
     const selectedVideoLengths = videoLength && videoLength.trim() ? videoLength.split(',').filter(v => v.trim()) : [];
     console.log('선택된 동영상 길이:', selectedVideoLengths.length > 0 ? selectedVideoLengths : '모든 길이 허용 (필터 없음)');
+
+    // ========== Elasticsearch 캐시 우선 로직 시작 ==========
+    const searchParameters = {
+      country,
+      keyword,
+      minViews,
+      maxViews,
+      uploadPeriod,
+      startDate,
+      endDate,
+      videoLength,
+      maxResults: finalMaxResults
+    };
+    
+    // 1단계: 캐시 히트 확인
+    console.log('🔍 Elasticsearch 캐시 확인 중...');
+    const cacheResult = await esHelper.checkCacheHit(searchParameters);
+    console.log('📊 캐시 확인 결과:', cacheResult);
+    
+    if (cacheResult.hit) {
+      // 캐시 히트: ES에서 결과 조회
+      console.log('✅ 캐시 히트! Elasticsearch에서 결과 조회');
+      const cachedResults = await esHelper.searchVideos(searchParameters);
+      
+      if (cachedResults && cachedResults.length > 0) {
+        console.log(`📦 캐시에서 ${cachedResults.length}개 결과 반환`);
+        return res.json({
+          success: true,
+          data: cachedResults,
+          total: cachedResults.length,
+          source: 'elasticsearch_cache'
+        });
+      } else {
+        console.log('⚠️ 캐시 히트였지만 결과가 없음, YouTube API로 fallback');
+      }
+    } else {
+      console.log('❌ 캐시 미스:', cacheResult.reason);
+      console.log('🔄 YouTube API 호출로 진행');
+    }
+    // ========== Elasticsearch 캐시 우선 로직 끝 ==========
 
     let searchResults = [];
     let nextPageToken = '';
@@ -347,48 +681,35 @@ app.get('/api/search', async (req, res) => {
        let response;
        let currentApiKey = apiKeyManager.getCurrentKey();
        
-       try {
-         const youtube = apiKeyManager.getYouTubeInstance();
-         response = await youtube.search.list(searchParams);
-       } catch (apiError) {
-        console.error('YouTube API 오류:', apiError.message);
-        
-                          // 할당량 초과 오류 처리
-          if (apiError.message.includes('quota') || apiError.message.includes('quotaExceeded')) {
-            console.log(`🚫 ${currentApiKey.name} 할당량 초과 감지`);
-            
-            const newApiKey = apiKeyManager.markKeyAsQuotaExceeded(currentApiKey);
-            if (newApiKey) {
-              console.log(`🔄 ${newApiKey.name}로 재시도합니다...`);
-              try {
-                // 새로운 API 키로 YouTube 인스턴스 직접 생성
-                const youtube = google.youtube({ version: 'v3', auth: newApiKey.key });
-                response = await youtube.search.list(searchParams);
-                console.log(`✅ ${newApiKey.name}로 성공`);
-              } catch (retryError) {
-                if (retryError.message.includes('quota') || retryError.message.includes('quotaExceeded')) {
-                  console.log(`❌ ${newApiKey.name}도 할당량 초과, 다음 키로 재시도...`);
-                  // 재귀적으로 다음 키 시도
-                  const nextKey = apiKeyManager.markKeyAsQuotaExceeded(newApiKey);
-                  if (nextKey) {
-                    console.log(`🔄 ${nextKey.name}로 재시도...`);
-                    const youtube = google.youtube({ version: 'v3', auth: nextKey.key });
-                    response = await youtube.search.list(searchParams);
-                    console.log(`✅ ${nextKey.name}로 성공`);
-                  } else {
-                    console.log('❌ 모든 API 키의 할당량이 초과되었습니다.');
-                    throw retryError;
-                  }
-                } else {
-                  throw retryError;
-                }
-              }
-            } else {
-              throw apiError; // 사용 가능한 키가 없으면 오류 전파
-            }
-          }
-        // regionCode 관련 오류인 경우 처리
-        else if ((apiError.message.includes('regionCode') || apiError.message.includes('invalid region')) && searchParams.regionCode) {
+       // 견고한 API 키 전환 로직으로 재작성
+       let retryCount = 0;
+       const maxRetries = apiKeyManager.apiKeys.length;
+       
+       while (retryCount < maxRetries) {
+         try {
+           currentApiKey = apiKeyManager.getCurrentKey();
+           const youtube = google.youtube({ version: 'v3', auth: currentApiKey.key });
+           response = await youtube.search.list(searchParams);
+           break; // 성공하면 루프 종료
+         } catch (apiError) {
+           console.error(`YouTube API 오류 (${currentApiKey.name}):`, apiError.message);
+           
+           // 할당량 초과 오류인 경우 다음 키로 전환
+           if (apiError.message.includes('quota') || apiError.message.includes('quotaExceeded')) {
+             console.log(`🚫 ${currentApiKey.name} 할당량 초과 감지`);
+             
+             const newApiKey = apiKeyManager.markKeyAsQuotaExceeded(currentApiKey);
+             if (newApiKey) {
+               console.log(`🔄 ${newApiKey.name}로 재시도합니다... (재시도 ${retryCount + 1}/${maxRetries})`);
+               retryCount++;
+               continue; // 다음 반복으로 계속
+             } else {
+               console.log('❌ 모든 API 키의 할당량이 초과되었습니다.');
+               throw new Error('ALL_QUOTA_EXCEEDED: 모든 API 키의 할당량이 초과되었습니다.');
+             }
+           }
+           // regionCode 관련 오류인 경우 처리
+           else if ((apiError.message.includes('regionCode') || apiError.message.includes('invalid region')) && searchParams.regionCode) {
           console.log('🚨 regionCode 오류 발생!');
           console.log(`  - 요청한 국가: ${country}`);
           console.log(`  - 사용한 regionCode: ${searchParams.regionCode}`);
@@ -437,15 +758,22 @@ app.get('/api/search', async (req, res) => {
             originalRegionCode: originalRegionCode
           });
           
-          const youtube = apiKeyManager.getYouTubeInstance();
-          response = await youtube.search.list(searchParams);
-          console.log('  ✅ 전세계 검색으로 성공');
-          console.log(`  ⚠️  주의: "${country}" 검색이 전세계 검색으로 변경되었습니다.`);
-        } else {
-          console.log('복구할 수 없는 API 오류:', apiError.message);
-          throw apiError; // 다른 오류는 그대로 전파
-        }
-      }
+             const youtube = google.youtube({ version: 'v3', auth: currentApiKey.key });
+             response = await youtube.search.list(searchParams);
+             console.log('  ✅ 전세계 검색으로 성공');
+             console.log(`  ⚠️  주의: "${country}" 검색이 전세계 검색으로 변경되었습니다.`);
+             break; // 성공하면 루프 종료
+           } else {
+             console.log('복구할 수 없는 API 오류:', apiError.message);
+             throw apiError; // 다른 오류는 그대로 전파
+           }
+         }
+       }
+       
+       // 최대 재시도 횟수 초과 시
+       if (retryCount >= maxRetries && !response) {
+         throw new Error('MAX_RETRIES_EXCEEDED: 모든 API 키 재시도 실패');
+       }
       
       if (!response.data.items || response.data.items.length === 0) {
         break;
@@ -456,56 +784,46 @@ app.get('/api/search', async (req, res) => {
       // 비디오 ID 수집
       const videoIds = response.data.items.map(item => item.id.videoId);
       
-      // 비디오 상세 정보 가져오기 (조회수, 통계 포함)
+      // 비디오 상세 정보 가져오기 (조회수, 통계 포함) - 견고한 API 키 전환 로직
       let videoDetails;
-      try {
-        const youtube = apiKeyManager.getYouTubeInstance();
-        videoDetails = await youtube.videos.list({
-          part: 'snippet,statistics,contentDetails',
-          id: videoIds.join(',')
-        });
-                           } catch (detailError) {
+      let detailRetryCount = 0;
+      const detailMaxRetries = apiKeyManager.apiKeys.length;
+      
+      while (detailRetryCount < detailMaxRetries) {
+        try {
+          const currentDetailKey = apiKeyManager.getCurrentKey();
+          const youtube = google.youtube({ version: 'v3', auth: currentDetailKey.key });
+          videoDetails = await youtube.videos.list({
+            part: 'snippet,statistics,contentDetails',
+            id: videoIds.join(',')
+          });
+          break; // 성공하면 루프 종료
+        } catch (detailError) {
+          console.error(`비디오 상세정보 조회 오류:`, detailError.message);
+          
           if (detailError.message.includes('quota') || detailError.message.includes('quotaExceeded')) {
             console.log('🚫 비디오 상세정보 조회 중 할당량 초과 감지');
             
-            let currentDetailKey = apiKeyManager.getCurrentKey();
+            const currentDetailKey = apiKeyManager.getCurrentKey();
             const newDetailKey = apiKeyManager.markKeyAsQuotaExceeded(currentDetailKey);
             if (newDetailKey) {
-              console.log(`🔄 ${newDetailKey.name}로 비디오 상세정보 재시도...`);
-              
-              try {
-                const youtube = google.youtube({ version: 'v3', auth: newDetailKey.key });
-                videoDetails = await youtube.videos.list({
-                  part: 'snippet,statistics,contentDetails',
-                  id: videoIds.join(',')
-                });
-                console.log(`✅ ${newDetailKey.name}로 비디오 상세정보 조회 성공`);
-              } catch (retryDetailError) {
-                if (retryDetailError.message.includes('quota') || retryDetailError.message.includes('quotaExceeded')) {
-                  console.log(`❌ ${newDetailKey.name}도 할당량 초과, 다음 키로 재시도...`);
-                  const nextDetailKey = apiKeyManager.markKeyAsQuotaExceeded(newDetailKey);
-                  if (nextDetailKey) {
-                    console.log(`🔄 ${nextDetailKey.name}로 비디오 상세정보 재시도...`);
-                    const youtube = google.youtube({ version: 'v3', auth: nextDetailKey.key });
-                    videoDetails = await youtube.videos.list({
-                      part: 'snippet,statistics,contentDetails',
-                      id: videoIds.join(',')
-                    });
-                    console.log(`✅ ${nextDetailKey.name}로 비디오 상세정보 조회 성공`);
-                  } else {
-                    throw retryDetailError;
-                  }
-                } else {
-                  throw retryDetailError;
-                }
-              }
+              console.log(`🔄 ${newDetailKey.name}로 비디오 상세정보 재시도... (재시도 ${detailRetryCount + 1}/${detailMaxRetries})`);
+              detailRetryCount++;
+              continue; // 다음 반복으로 계속
             } else {
-              throw detailError;
+              console.log('❌ 모든 API 키의 할당량이 초과되었습니다.');
+              throw new Error('ALL_QUOTA_EXCEEDED: 모든 API 키의 할당량이 초과되었습니다.');
             }
           } else {
             throw detailError;
           }
         }
+      }
+      
+      // 최대 재시도 횟수 초과 시
+      if (detailRetryCount >= detailMaxRetries && !videoDetails) {
+        throw new Error('MAX_RETRIES_EXCEEDED: 비디오 상세정보 조회 실패');
+      }
 
              // 검색 결과 처리 (중복 제거)
        for (const video of videoDetails.data.items) {
@@ -532,7 +850,11 @@ app.get('/api/search', async (req, res) => {
 
         const result = {
           youtube_channel_name: video.snippet.channelTitle,
-          thumbnail_url: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url,
+          thumbnail_url: video.snippet.thumbnails.maxres?.url || 
+                        video.snippet.thumbnails.standard?.url || 
+                        video.snippet.thumbnails.high?.url || 
+                        video.snippet.thumbnails.medium?.url || 
+                        video.snippet.thumbnails.default?.url,
           status: 'active',
           youtube_channel_id: video.snippet.channelId,
           primary_category: await getCategoryName(video.snippet.categoryId),
@@ -576,10 +898,24 @@ app.get('/api/search', async (req, res) => {
      // API 키 사용 통계 출력
      apiKeyManager.printUsageStats();
 
+    // ========== YouTube API 결과를 Elasticsearch에 인덱싱 ==========
+    if (searchResults.length > 0) {
+      console.log('📝 YouTube API 결과를 Elasticsearch에 인덱싱 중...');
+      try {
+        await esHelper.bulkUpsertVideos(searchResults, searchParameters);
+        console.log('✅ Elasticsearch 인덱싱 완료');
+      } catch (esError) {
+        console.error('⚠️ Elasticsearch 인덱싱 실패:', esError.message);
+        console.log('💡 YouTube API 결과는 정상 반환하지만 캐시 저장은 실패했습니다.');
+      }
+    }
+    // ========== Elasticsearch 인덱싱 끝 ==========
+
     res.json({
       success: true,
       data: searchResults,
-      total: searchResults.length
+      total: searchResults.length,
+      source: 'youtube_api_with_es_cache'
     });
 
   } catch (error) {
@@ -588,27 +924,46 @@ app.get('/api/search', async (req, res) => {
     // API 키 사용 통계 출력 (오류 발생 시에도)
     apiKeyManager.printUsageStats();
     
-    // YouTube API quota 초과 오류 처리
+    // YouTube API quota 초과 오류 처리 - 수정된 로직
     if (error.message.includes('quota') || error.message.includes('quotaExceeded')) {
-      console.error('YouTube API 할당량 초과');
+      console.error('YouTube API 할당량 초과 감지');
       
+      // 실제로 사용 가능한 키가 있는지 확인
       const availableKeys = apiKeyManager.apiKeys.filter(key => !key.quotaExceeded);
       const totalKeys = apiKeyManager.apiKeys.length;
       const exhaustedKeys = totalKeys - availableKeys.length;
       
-      res.status(429).json({
-        success: false,
-        error: `YouTube API 일일 할당량을 초과했습니다. (${exhaustedKeys}/${totalKeys} 키 사용됨)`,
-        errorType: 'quota_exceeded',
-        details: availableKeys.length > 0 
-          ? `${availableKeys.length}개의 추가 API 키가 사용 가능합니다.`
-          : '모든 API 키의 할당량이 초과되었습니다. 내일 자동으로 할당량이 재설정됩니다.',
-        keyStats: {
-          total: totalKeys,
-          available: availableKeys.length,
-          exhausted: exhaustedKeys
-        }
-      });
+      // 사용 가능한 키가 있으면 429 에러를 반환하지 않고 재시도 유도
+      if (availableKeys.length > 0) {
+        console.log(`사용 가능한 API 키가 ${availableKeys.length}개 남아있음, 이 오류는 내부 처리 중 발생한 일시적 오류입니다.`);
+        
+        // 500 에러로 반환하여 클라이언트가 재시도할 수 있도록 함
+        res.status(500).json({
+          success: false,
+          error: '일시적인 API 키 전환 오류가 발생했습니다. 잠시 후 재시도해 주세요.',
+          errorType: 'temporary_api_key_switch_error',
+          details: `${availableKeys.length}개의 API 키가 사용 가능합니다.`,
+          keyStats: {
+            total: totalKeys,
+            available: availableKeys.length,
+            exhausted: exhaustedKeys
+          }
+        });
+      } else {
+        // 모든 키가 실제로 소진된 경우에만 429 에러 반환
+        console.error('모든 YouTube API 키의 할당량이 초과됨');
+        res.status(429).json({
+          success: false,
+          error: `YouTube API 일일 할당량을 초과했습니다. (${exhaustedKeys}/${totalKeys} 키 사용됨)`,
+          errorType: 'quota_exceeded',
+          details: '모든 API 키의 할당량이 초과되었습니다. 내일 자동으로 할당량이 재설정됩니다.',
+          keyStats: {
+            total: totalKeys,
+            available: availableKeys.length,
+            exhausted: exhaustedKeys
+          }
+        });
+      }
     } else if (error.message.includes('API key')) {
       console.error('YouTube API 키 오류');
       res.status(401).json({
