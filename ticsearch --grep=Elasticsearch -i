@@ -1,0 +1,17 @@
+[33mcommit 2a2d072bb5c196f5bdd28143a44d391e3b27e4fd[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: danielritchie <javacai19@yonsei.ac.kr>
+Date:   Fri Aug 22 05:37:11 2025 +0900
+
+    elasticsearch integration II
+
+.env
+curl
+elasticsearch_app_integration copy.md
+elasticsearch_app_integration.md
+node_modules/.package-lock.json
+package-lock.json
+package.json
+searching_speed.md
+server.js
+videos_mapping.json
+you_list.html
