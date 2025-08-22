@@ -18,6 +18,19 @@ try {
   esClient = null;
 }
 
+// Elasticsearch 연결 상태 확인 함수
+async function checkESConnection() {
+  if (!esClient) return false;
+  try {
+    await esClient.ping();
+    return true;
+  } catch (error) {
+    console.warn('ES 연결 끊어짐:', error.message);
+    esClient = null;
+    return false;
+  }
+}
+
 // 다중 API 키 관리 시스템
 class ApiKeyManager {
   constructor() {
@@ -315,7 +328,7 @@ class ElasticsearchHelper {
 
   // 캐시 히트 판단
   async checkCacheHit(searchParams) {
-    if (!this.client) return { hit: false, reason: 'ES client not available' };
+    if (!this.client || !(await checkESConnection())) return { hit: false, reason: 'ES client not available' };
     
     try {
       const { country, keyword, minViews, maxViews, maxResults } = searchParams;
@@ -398,7 +411,7 @@ class ElasticsearchHelper {
   
   // ES에서 검색 결과 조회
   async searchVideos(searchParams) {
-    if (!this.client) return null;
+    if (!this.client || !(await checkESConnection())) return null;
     
     try {
       const { country, keyword, minViews, maxViews, maxResults } = searchParams;
@@ -468,7 +481,7 @@ class ElasticsearchHelper {
   
   // YouTube API 결과를 ES에 bulk upsert
   async bulkUpsertVideos(videos, searchParams) {
-    if (!this.client || !videos || videos.length === 0) return;
+    if (!this.client || !videos || videos.length === 0 || !(await checkESConnection())) return;
     
     try {
       const body = [];
@@ -530,6 +543,50 @@ class ElasticsearchHelper {
 // ES 헬퍼 인스턴스 생성
 const esHelper = new ElasticsearchHelper(esClient);
 
+// 간단한 Rate Limiting 구현
+const requestTracker = new Map();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15분
+const RATE_LIMIT_MAX_REQUESTS = 10; // 15분당 최대 10회 검색
+
+function rateLimitMiddleware(req, res, next) {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  
+  // 이전 요청 기록 가져오기
+  let requests = requestTracker.get(clientIP) || [];
+  
+  // 오래된 요청 제거 (15분 이전)
+  requests = requests.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+  
+  // 제한 초과 확인
+  if (requests.length >= RATE_LIMIT_MAX_REQUESTS) {
+    return res.status(429).json({
+      success: false,
+      error: '검색 요청이 너무 많습니다. 15분 후에 다시 시도해주세요.',
+      retryAfter: Math.ceil((requests[0] + RATE_LIMIT_WINDOW - now) / 1000)
+    });
+  }
+  
+  // 현재 요청 추가
+  requests.push(now);
+  requestTracker.set(clientIP, requests);
+  
+  next();
+}
+
+// 주기적으로 오래된 데이터 정리
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, requests] of requestTracker.entries()) {
+    const validRequests = requests.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+    if (validRequests.length === 0) {
+      requestTracker.delete(ip);
+    } else {
+      requestTracker.set(ip, validRequests);
+    }
+  }
+}, 5 * 60 * 1000); // 5분마다 정리
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -546,20 +603,22 @@ app.get('/', (req, res) => {
 });
 
 // YouTube 동영상 검색 API
-app.get('/api/search', async (req, res) => {
+app.get('/api/search', rateLimitMiddleware, async (req, res) => {
   const searchStartTime = Date.now(); // 검색 시작 시간 기록
   
   try {
     const {
       country = 'worldwide',  // 기본값을 전세계로 변경
       keyword = '',
+      searchScope = 'title',  // 검색 범위: title, channel, 또는 분리된 문자열
       maxViews,
       minViews = 100000,
       uploadPeriod,
       startDate,
       endDate,
       videoLength,
-      maxResults = 60   // 기본값 60건
+      maxResults = 60,   // 기본값 60건
+      categories = ''   // 카테고리 필터
     } = req.query;
 
     // maxResults 유효성 검사 및 변환
@@ -569,6 +628,8 @@ app.get('/api/search', async (req, res) => {
 
     console.log('검색 파라미터:', req.query);
     console.log('선택된 국가:', country);
+    console.log('검색 범위:', searchScope);
+    console.log('선택된 카테고리:', categories);
     console.log(`검색 결과 수: ${finalMaxResults}건 (요청: ${maxResults})`);
 
     // 동영상 길이 파라미터 파싱
@@ -579,6 +640,8 @@ app.get('/api/search', async (req, res) => {
     const searchParameters = {
       country,
       keyword,
+      searchScope,
+      categories,
       minViews,
       maxViews,
       uploadPeriod,
@@ -749,12 +812,12 @@ app.get('/api/search', async (req, res) => {
     if (startDate || endDate) {
       if (startDate) {
         try {
-          const startDateTime = new Date(startDate + 'T00:00:00');
+          const startDateTime = new Date(startDate + 'T00:00:00.000Z'); // UTC 기준으로 명시적 처리
           if (isNaN(startDateTime.getTime())) {
             throw new Error('Invalid start date');
           }
           searchParams.publishedAfter = startDateTime.toISOString();
-          console.log('✅ 시작일 설정 성공:', startDateTime.toISOString());
+          console.log('✅ 시작일 설정 성공 (UTC):', startDateTime.toISOString());
         } catch (error) {
           console.error('❌ 시작일 처리 오류:', error.message, '입력값:', startDate);
           // 오류 시 시작일 무시하고 계속 진행
@@ -762,12 +825,12 @@ app.get('/api/search', async (req, res) => {
       }
       if (endDate) {
         try {
-          const endDateTime = new Date(endDate + 'T23:59:59');
+          const endDateTime = new Date(endDate + 'T23:59:59.999Z'); // UTC 기준으로 명시적 처리
           if (isNaN(endDateTime.getTime())) {
             throw new Error('Invalid end date');
           }
           searchParams.publishedBefore = endDateTime.toISOString();
-          console.log('✅ 종료일 설정 성공:', endDateTime.toISOString());
+          console.log('✅ 종료일 설정 성공 (UTC):', endDateTime.toISOString());
         } catch (error) {
           console.error('❌ 종료일 처리 오류:', error.message, '입력값:', endDate);
           // 오류 시 종료일 무시하고 계속 진행
@@ -803,7 +866,11 @@ app.get('/api/search', async (req, res) => {
        while (retryCount < maxRetries) {
          try {
            currentApiKey = apiKeyManager.getCurrentKey();
-           const youtube = google.youtube({ version: 'v3', auth: currentApiKey.key });
+           const youtube = google.youtube({ 
+             version: 'v3', 
+             auth: currentApiKey.key,
+             timeout: 30000 // 30초 타임아웃
+           });
            response = await youtube.search.list(searchParams);
            break; // 성공하면 루프 종료
          } catch (apiError) {
@@ -873,7 +940,11 @@ app.get('/api/search', async (req, res) => {
             originalRegionCode: originalRegionCode
           });
           
-             const youtube = google.youtube({ version: 'v3', auth: currentApiKey.key });
+             const youtube = google.youtube({ 
+               version: 'v3', 
+               auth: currentApiKey.key,
+               timeout: 30000 // 30초 타임아웃
+             });
              response = await youtube.search.list(searchParams);
              console.log('  ✅ 전세계 검색으로 성공');
              console.log(`  ⚠️  주의: "${country}" 검색이 전세계 검색으로 변경되었습니다.`);
@@ -907,7 +978,11 @@ app.get('/api/search', async (req, res) => {
       while (detailRetryCount < detailMaxRetries) {
         try {
           const currentDetailKey = apiKeyManager.getCurrentKey();
-          const youtube = google.youtube({ version: 'v3', auth: currentDetailKey.key });
+          const youtube = google.youtube({ 
+            version: 'v3', 
+            auth: currentDetailKey.key,
+            timeout: 30000 // 30초 타임아웃
+          });
           videoDetails = await youtube.videos.list({
             part: 'snippet,statistics,contentDetails',
             id: videoIds.join(',')
@@ -949,6 +1024,21 @@ app.get('/api/search', async (req, res) => {
          }
          
          const viewCount = parseInt(video.statistics.viewCount || 0);
+         
+         // 카테고리 필터링 (안전한 처리)
+         let selectedCategories = [];
+         if (categories) {
+           if (typeof categories === 'string') {
+             selectedCategories = categories.split(',').filter(c => c.trim());
+           } else if (Array.isArray(categories)) {
+             selectedCategories = categories.filter(c => c && typeof c === 'string' && c.trim());
+           }
+         }
+         
+         if (selectedCategories.length > 0 && !selectedCategories.includes(video.snippet.categoryId)) {
+           console.log(`카테고리 필터링: ${video.snippet.categoryId} 제외`);
+           continue;
+         }
          
          // 조회수 필터링
          if (minViews && viewCount < parseInt(minViews)) continue;
@@ -1001,6 +1091,17 @@ app.get('/api/search', async (req, res) => {
 
          // 조회수 기준 내림차순 정렬
      searchResults.sort((a, b) => b.daily_view_count - a.daily_view_count);
+
+     // 메모리 누수 방지를 위한 메모리 정리
+     try {
+       processedVideoIds.clear();
+       processedChannelTitles.clear();
+       if (global.gc) {
+         global.gc();
+       }
+     } catch (memError) {
+       console.warn('메모리 정리 오류:', memError.message);
+     }
 
      // 중복 제거 통계
      const totalProcessed = processedVideoIds.size + searchResults.length;
@@ -1123,6 +1224,15 @@ app.post('/api/download-excel', async (req, res) => {
     
     if (!searchResults || !Array.isArray(searchResults)) {
       return res.status(400).json({ error: '검색 결과 데이터가 필요합니다.' });
+    }
+
+    // 대용량 데이터 제한 추가
+    if (searchResults.length > 1000) {
+      return res.status(413).json({ 
+        error: '결과가 너무 많습니다. 1000건 이하로 필터링해주세요.',
+        maxAllowed: 1000,
+        currentCount: searchResults.length
+      });
     }
 
     // Excel용 데이터 변환
@@ -1444,7 +1554,12 @@ function matchesVideoLength(videoLengthCategory, selectedLengths) {
 // 채널 구독자 수 가져오기
 async function getChannelSubscriberCount(channelId) {
   try {
-    const youtube = apiKeyManager.getYouTubeInstance();
+    const currentKey = apiKeyManager.getCurrentKey();
+    const youtube = google.youtube({ 
+      version: 'v3', 
+      auth: currentKey.key,
+      timeout: 30000 // 30초 타임아웃
+    });
     const channelResponse = await youtube.channels.list({
       part: 'statistics',
       id: channelId
@@ -1478,13 +1593,35 @@ async function getCategoryName(categoryId) {
       '25': 'News & Politics',
       '26': 'Howto & Style',
       '27': 'Education',
-      '28': 'Science & Technology'
+      '28': 'Science & Technology',
+      '29': 'Nonprofits & Activism'
     };
     
     return categories[categoryId] || 'Other';
   } catch (error) {
     return 'Other';
   }
+}
+
+// 안전한 파일명 생성 함수 (한글 보존)
+function createSafeFilename(filename) {
+  if (!filename) return 'thumbnail.jpg';
+  
+  let safe = filename
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_') // 위험한 문자만 제거
+    .replace(/\s+/g, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .substring(0, 100);
+    
+  // 파일명이 비어있거나 너무 짧으면 기본값
+  if (safe.length < 3) safe = 'thumbnail';
+  
+  if (!safe.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+    safe += '.jpg';
+  }
+  
+  return safe;
 }
 
 // 썸네일 다운로드 API (ERR_INVALID_CHAR 오류 해결)
@@ -1498,46 +1635,9 @@ if (!url) {
       return res.status(400).json({ error: 'URL이 필요합니다.' });
 }
 
-// 파일명 안전하게 처리 (ERR_INVALID_CHAR 오류 방지)
-let safeFilename = filename || 'thumbnail.jpg';
-
-// 파일명이 이미 안전한지 확인하는 함수
-function isFilenameSafe(fname) {
-  // ASCII가 아닌 문자, 특수문자, 제어문자 등 확인
-    const unsafePattern = /[^\x20-\x7E]|[<>:"/\\|?*\x00-\x1f]/;
-    return !unsafePattern.test(fname) && fname.length <= 100 && fname.trim() === fname;
-}
-
-// 파일명이 이미 안전하다면 변환하지 않음
-if (isFilenameSafe(safeFilename)) {
-console.log('✅ 파일명이 이미 안전함:', safeFilename);
-} else {
-  console.log('🔧 파일명 변환 필요:', { original: safeFilename });
-  
-  // 특수문자 및 유니코드 문자 제거/변경
-safeFilename = safeFilename
-    .normalize('NFD')                          // 유니코드 정규화
-    .replace(/[\u0300-\u036f]/g, '')          // 발음 기호 제거
-    .replace(/[^\x00-\x7F]/g, '')             // ASCII가 아닌 문자 제거 (한글, 이모지 등)
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')   // 파일명에 사용 불가한 문자들 제거
-  .replace(/["'`]/g, '')                    // 따옴표 제거
-    .replace(/\s+/g, '_')                     // 공백을 언더스코어로 변경
-    .replace(/_{2,}/g, '_')                   // 연속된 언더스코어를 하나로 변경
-    .replace(/^_+|_+$/g, '')                  // 앞뒤 언더스코어 제거
-        .substring(0, 100);                       // 파일명 길이 제한
-      
-      // 파일명이 비어있으면 기본값 설정
-      if (!safeFilename || safeFilename.length === 0) {
-        safeFilename = 'thumbnail';
-      }
-      
-      // 파일 확장자 확인 및 추가
-      if (!safeFilename.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/)) {
-        safeFilename += '.jpg';
-      }
-      
-      console.log('🔧 파일명 변환 완료:', { original: filename, safe: safeFilename });
-    }
+// 안전한 파일명 생성
+const safeFilename = createSafeFilename(filename);
+console.log('🔧 안전한 파일명 생성:', { original: filename, safe: safeFilename });
 
     const response = await axios.get(url, { 
       responseType: 'stream',

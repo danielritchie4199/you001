@@ -1,126 +1,126 @@
 {
-  "date": "Fri Aug 22 2025",
-  "lastUpdated": "2025-08-22T05:31:14.632Z",
+  "date": "Sat Aug 23 2025",
+  "lastUpdated": "2025-08-22T18:52:26.797Z",
   "keys": [
     {
       "index": 1,
       "name": "API_KEY_1",
-      "quotaExceeded": true,
-      "usageCount": 100,
+      "quotaExceeded": false,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-21T22:16:36.557Z"
+      "lastUsed": null
     },
     {
       "index": 2,
       "name": "API_KEY_2",
-      "quotaExceeded": true,
-      "usageCount": 95,
+      "quotaExceeded": false,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-21T22:16:36.660Z"
+      "lastUsed": null
     },
     {
       "index": 3,
       "name": "API_KEY_3",
-      "quotaExceeded": true,
-      "usageCount": 88,
+      "quotaExceeded": false,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-21T22:16:36.771Z"
+      "lastUsed": null
     },
     {
       "index": 4,
       "name": "API_KEY_4",
       "quotaExceeded": false,
-      "usageCount": 500,
-      "consecutiveErrors": 3,
-      "lastUsed": "2025-08-22T03:50:48.855Z"
+      "usageCount": 0,
+      "consecutiveErrors": 0,
+      "lastUsed": null
     },
     {
       "index": 5,
       "name": "API_KEY_5",
       "quotaExceeded": false,
-      "usageCount": 515,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:13.992Z"
+      "lastUsed": null
     },
     {
       "index": 6,
       "name": "API_KEY_6",
       "quotaExceeded": false,
-      "usageCount": 515,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:14.120Z"
+      "lastUsed": null
     },
     {
       "index": 7,
       "name": "API_KEY_7",
       "quotaExceeded": false,
-      "usageCount": 515,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:14.246Z"
+      "lastUsed": null
     },
     {
       "index": 8,
       "name": "API_KEY_8",
       "quotaExceeded": false,
-      "usageCount": 515,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:14.368Z"
+      "lastUsed": null
     },
     {
       "index": 9,
       "name": "API_KEY_9",
       "quotaExceeded": false,
-      "usageCount": 515,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:14.499Z"
+      "lastUsed": null
     },
     {
       "index": 10,
       "name": "API_KEY_10",
       "quotaExceeded": false,
-      "usageCount": 515,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:14.632Z"
+      "lastUsed": null
     },
     {
       "index": 11,
       "name": "API_KEY_11",
       "quotaExceeded": false,
-      "usageCount": 514,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:11.800Z"
+      "lastUsed": null
     },
     {
       "index": 12,
       "name": "API_KEY_12",
       "quotaExceeded": false,
-      "usageCount": 514,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:11.936Z"
+      "lastUsed": null
     },
     {
       "index": 13,
       "name": "API_KEY_13",
       "quotaExceeded": false,
-      "usageCount": 514,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:13.552Z"
+      "lastUsed": null
     },
     {
       "index": 14,
       "name": "API_KEY_14",
       "quotaExceeded": false,
-      "usageCount": 514,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:13.716Z"
+      "lastUsed": null
     },
     {
       "index": 15,
       "name": "API_KEY_15",
       "quotaExceeded": false,
-      "usageCount": 514,
+      "usageCount": 0,
       "consecutiveErrors": 0,
-      "lastUsed": "2025-08-22T05:31:13.854Z"
+      "lastUsed": null
     }
   ]
 }

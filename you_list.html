@@ -160,6 +160,12 @@
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
+        
+        .category-display:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
 
         .category-dropdown {
             position: absolute;
@@ -937,7 +943,7 @@
                 <div class="form-group">
                     <label for="categories">카테고리</label>
                     <div class="category-selector">
-                        <div class="category-display" id="categoryDisplay">모든 카테고리 선택됨</div>
+                        <div class="category-display" id="categoryDisplay" tabindex="0">모든 카테고리 선택됨</div>
                         <div class="category-dropdown" id="categoryDropdown">
                             <div class="category-header">
                                 <input type="checkbox" id="selectAllCategories" checked>
@@ -999,6 +1005,10 @@
                                 <div class="category-item">
                                     <input type="checkbox" id="cat28" name="categories" value="28" checked>
                                     <label for="cat28">Science & Technology</label>
+                                </div>
+                                <div class="category-item">
+                                    <input type="checkbox" id="cat29" name="categories" value="29" checked>
+                                    <label for="cat29">Nonprofits & Activism</label>
                                 </div>
                             </div>
                         </div>
@@ -1249,6 +1259,9 @@
             }
         }
 
+        // 페이지 로드 시 초기 상태 설정
+        updateSearchScopeDisplay();
+
         // 모든 검색 범위 체크박스 상태 업데이트
         function updateSelectAllSearchScope() {
             const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]');
@@ -1267,29 +1280,28 @@
             }
         }
 
-        // 카테고리 드롭다운 기능
-        document.getElementById('categoryDisplay').addEventListener('click', () => {
-            const dropdown = document.getElementById('categoryDropdown');
-            dropdown.classList.toggle('show');
-        });
+        // 카테고리 드롭다운 기능은 DOMContentLoaded 이벤트에서 설정됨
 
         // 문서 클릭 시 드롭다운 닫기
         document.addEventListener('click', (e) => {
             // 검색 범위 드롭다운 처리
-            const searchScopeSelector = document.querySelector('.category-selector');
+            const searchScopeDisplay = document.getElementById('searchScopeDisplay');
             const searchScopeDropdown = document.getElementById('searchScopeDropdown');
             
-            if (searchScopeSelector && !searchScopeSelector.contains(e.target)) {
-                searchScopeDropdown.classList.remove('show');
+            if (searchScopeDisplay && searchScopeDropdown) {
+                const searchScopeSelector = searchScopeDisplay.closest('.category-selector');
+                if (searchScopeSelector && !searchScopeSelector.contains(e.target)) {
+                    searchScopeDropdown.classList.remove('show');
+                }
             }
             
-            // 카테고리 드롭다운 처리 (두 번째 category-selector)
-            const allCategorySelectors = document.querySelectorAll('.category-selector');
-            if (allCategorySelectors.length > 1) {
-                const categorySelector = allCategorySelectors[1];
-                const categoryDropdown = document.getElementById('categoryDropdown');
-                
-                if (!categorySelector.contains(e.target)) {
+            // 카테고리 드롭다운 처리
+            const categoryDisplay = document.getElementById('categoryDisplay');
+            const categoryDropdown = document.getElementById('categoryDropdown');
+            
+            if (categoryDisplay && categoryDropdown) {
+                const categorySelector = categoryDisplay.closest('.category-selector');
+                if (categorySelector && !categorySelector.contains(e.target)) {
                     categoryDropdown.classList.remove('show');
                 }
             }
@@ -1697,6 +1709,62 @@
             }
         }
 
+        // 통합된 초기화 함수
+        function initializeApp() {
+            
+            // 동영상 길이 체크박스 이벤트 리스너 추가
+            const videoLengthCheckboxes = [
+                'shortForm1', 'shortForm2', 'midForm1', 'midForm2', 
+                'longForm1', 'longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'
+            ];
+            
+            videoLengthCheckboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.addEventListener('change', () => {
+                        updateSelectAllVideoLength();
+                        updateGroupCheckboxes();
+                    });
+                }
+            });
+            
+            // 카테고리 드롭다운 초기화
+            const categoryDisplay = document.getElementById('categoryDisplay');
+            const categoryDropdown = document.getElementById('categoryDropdown');
+            
+            if (categoryDisplay && categoryDropdown) {
+                categoryDisplay.addEventListener('click', categoryDisplayClickHandler);
+                categoryDisplay.addEventListener('keydown', categoryDisplayKeyHandler);
+            }
+            
+            // 초기 상태 설정
+            updateSelectAllVideoLength();
+            updateGroupCheckboxes();
+            updateSearchScopeDisplay();
+            updateCategoryDisplay();
+            
+        }
+        
+        // DOMContentLoaded 이벤트 (단일)
+        document.addEventListener('DOMContentLoaded', initializeApp);
+        
+        // 카테고리 드롭다운 클릭 핸들러 함수
+        function categoryDisplayClickHandler() {
+            const dropdown = document.getElementById('categoryDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('show');
+                console.log('카테고리 드롭다운 클릭됨, show 클래스:', dropdown.classList.contains('show'));
+            }
+        }
+        
+        // 카테고리 키보드 이벤트 핸들러
+        function categoryDisplayKeyHandler(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                categoryDisplayClickHandler();
+            }
+        }
+
         // 그룹 체크박스 상태 업데이트
         function updateGroupCheckboxes() {
             const first2Checkboxes = ['shortForm1', 'shortForm2'];
@@ -1898,6 +1966,20 @@
                 willSend: selectedCategories.join(',') || '빈 문자열'
             });
             searchParams.append('categories', selectedCategories.join(','));
+
+            // 검색 범위 체크박스 처리
+            const selectedSearchScope = [];
+            document.querySelectorAll('input[name="searchScope"]:checked').forEach(checkbox => {
+                selectedSearchScope.push(checkbox.value);
+            });
+            
+            console.log('🔍 검색 범위 디버그:', {
+                selectedSearchScope: selectedSearchScope,
+                scopeCount: selectedSearchScope.length,
+                joinedString: selectedSearchScope.join(','),
+                willSend: selectedSearchScope.join(',') || '빈 문자열'
+            });
+            searchParams.append('searchScope', selectedSearchScope.join(','));
 
             // 키워드 확인 및 안내 메시지
             const keyword = document.getElementById('keyword').value;
@@ -2524,6 +2606,42 @@
             }
         }
 
+        // 동영상 링크 클릭 시 URL 복사 및 새 탭 열기
+        function openVideoWithCopy(videoUrl) {
+            try {
+                // URL을 클립보드에 복사
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(videoUrl).then(() => {
+                        console.log('동영상 URL이 클립보드에 복사되었습니다:', videoUrl);
+                    }).catch(err => {
+                        console.log('URL 복사 실패:', err);
+                    });
+                } else {
+                    // 구형 브라우저 지원
+                    const textArea = document.createElement('textarea');
+                    textArea.value = videoUrl;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        console.log('동영상 URL이 클립보드에 복사되었습니다 (fallback):', videoUrl);
+                    } catch (fallbackErr) {
+                        console.log('URL 복사 fallback 실패:', fallbackErr);
+                    }
+                    document.body.removeChild(textArea);
+                }
+                
+                // 새 탭에서 동영상 열기
+                window.open(videoUrl, '_blank');
+                
+                console.log('동영상 링크 열기:', videoUrl);
+            } catch (error) {
+                console.error('동영상 링크 처리 오류:', error);
+                // 오류가 발생해도 최소한 링크는 열기
+                window.open(videoUrl, '_blank');
+            }
+        }
+
         // 동영상 다운로드 함수 (화질 선택 모달 열기)
         let currentVideoUrl = '';
         let currentVideoTitle = '';
@@ -2870,29 +2988,28 @@
             }
         }
 
-        // 카테고리 드롭다운 기능
-        document.getElementById('categoryDisplay').addEventListener('click', () => {
-            const dropdown = document.getElementById('categoryDropdown');
-            dropdown.classList.toggle('show');
-        });
-
+        // 카테고리 드롭다운 기능 (DOMContentLoaded에서 설정됨)
+        
         // 문서 클릭 시 드롭다운 닫기
         document.addEventListener('click', (e) => {
             // 검색 범위 드롭다운 처리
-            const searchScopeSelector = document.querySelector('.category-selector');
+            const searchScopeDisplay = document.getElementById('searchScopeDisplay');
             const searchScopeDropdown = document.getElementById('searchScopeDropdown');
             
-            if (searchScopeSelector && !searchScopeSelector.contains(e.target)) {
-                searchScopeDropdown.classList.remove('show');
+            if (searchScopeDisplay && searchScopeDropdown) {
+                const searchScopeSelector = searchScopeDisplay.closest('.category-selector');
+                if (searchScopeSelector && !searchScopeSelector.contains(e.target)) {
+                    searchScopeDropdown.classList.remove('show');
+                }
             }
             
-            // 카테고리 드롭다운 처리 (두 번째 category-selector)
-            const allCategorySelectors = document.querySelectorAll('.category-selector');
-            if (allCategorySelectors.length > 1) {
-                const categorySelector = allCategorySelectors[1];
-                const categoryDropdown = document.getElementById('categoryDropdown');
-                
-                if (!categorySelector.contains(e.target)) {
+            // 카테고리 드롭다운 처리
+            const categoryDisplay = document.getElementById('categoryDisplay');
+            const categoryDropdown = document.getElementById('categoryDropdown');
+            
+            if (categoryDisplay && categoryDropdown) {
+                const categorySelector = categoryDisplay.closest('.category-selector');
+                if (categorySelector && !categorySelector.contains(e.target)) {
                     categoryDropdown.classList.remove('show');
                 }
             }
@@ -2956,12 +3073,23 @@
             }
         }
 
-        // 페이지 로드 시 초기화
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('YouTube 채널 검색 시스템이 준비되었습니다.');
-            checkDownloadSupport();
-            showDownloadInfo();
-        });
+        // 카테고리 드롭다운 클릭 핸들러 함수 (간소화)
+        function categoryDisplayClickHandler() {
+            const dropdown = document.getElementById('categoryDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('show');
+            }
+        }
+        
+        // 카테고리 키보드 이벤트 핸들러
+        function categoryDisplayKeyHandler(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                categoryDisplayClickHandler();
+            }
+        }
+        
+        // 중복된 DOMContentLoaded 이벤트 제거됨 (통합된 initializeApp 함수로 대체)
     </script>
     
 
