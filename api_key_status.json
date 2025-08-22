@@ -1,0 +1,126 @@
+{
+  "date": "Fri Aug 22 2025",
+  "lastUpdated": "2025-08-22T05:31:14.632Z",
+  "keys": [
+    {
+      "index": 1,
+      "name": "API_KEY_1",
+      "quotaExceeded": true,
+      "usageCount": 100,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-21T22:16:36.557Z"
+    },
+    {
+      "index": 2,
+      "name": "API_KEY_2",
+      "quotaExceeded": true,
+      "usageCount": 95,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-21T22:16:36.660Z"
+    },
+    {
+      "index": 3,
+      "name": "API_KEY_3",
+      "quotaExceeded": true,
+      "usageCount": 88,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-21T22:16:36.771Z"
+    },
+    {
+      "index": 4,
+      "name": "API_KEY_4",
+      "quotaExceeded": false,
+      "usageCount": 500,
+      "consecutiveErrors": 3,
+      "lastUsed": "2025-08-22T03:50:48.855Z"
+    },
+    {
+      "index": 5,
+      "name": "API_KEY_5",
+      "quotaExceeded": false,
+      "usageCount": 515,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:13.992Z"
+    },
+    {
+      "index": 6,
+      "name": "API_KEY_6",
+      "quotaExceeded": false,
+      "usageCount": 515,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:14.120Z"
+    },
+    {
+      "index": 7,
+      "name": "API_KEY_7",
+      "quotaExceeded": false,
+      "usageCount": 515,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:14.246Z"
+    },
+    {
+      "index": 8,
+      "name": "API_KEY_8",
+      "quotaExceeded": false,
+      "usageCount": 515,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:14.368Z"
+    },
+    {
+      "index": 9,
+      "name": "API_KEY_9",
+      "quotaExceeded": false,
+      "usageCount": 515,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:14.499Z"
+    },
+    {
+      "index": 10,
+      "name": "API_KEY_10",
+      "quotaExceeded": false,
+      "usageCount": 515,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:14.632Z"
+    },
+    {
+      "index": 11,
+      "name": "API_KEY_11",
+      "quotaExceeded": false,
+      "usageCount": 514,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:11.800Z"
+    },
+    {
+      "index": 12,
+      "name": "API_KEY_12",
+      "quotaExceeded": false,
+      "usageCount": 514,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:11.936Z"
+    },
+    {
+      "index": 13,
+      "name": "API_KEY_13",
+      "quotaExceeded": false,
+      "usageCount": 514,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:13.552Z"
+    },
+    {
+      "index": 14,
+      "name": "API_KEY_14",
+      "quotaExceeded": false,
+      "usageCount": 514,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:13.716Z"
+    },
+    {
+      "index": 15,
+      "name": "API_KEY_15",
+      "quotaExceeded": false,
+      "usageCount": 514,
+      "consecutiveErrors": 0,
+      "lastUsed": "2025-08-22T05:31:13.854Z"
+    }
+  ]
+}

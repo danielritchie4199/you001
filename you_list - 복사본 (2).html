@@ -137,108 +137,6 @@
             margin: 0;
         }
 
-
-
-        /* 카테고리 선택기 스타일 */
-        .category-selector {
-            position: relative;
-        }
-
-        .category-display {
-            padding: 12px 16px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 1em;
-            user-select: none;
-            min-height: 1.2em;
-        }
-
-        .category-display:hover {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .category-dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 2px solid #667eea;
-            border-radius: 8px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-            z-index: 1000;
-            display: none;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .category-dropdown.show {
-            display: block;
-        }
-
-        .category-header {
-            padding: 12px 16px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-        }
-
-        .category-header input[type="checkbox"] {
-            transform: scale(1.1);
-        }
-
-        .category-header label {
-            cursor: pointer;
-            user-select: none;
-            margin: 0;
-        }
-
-        .category-options {
-            max-height: 250px;
-            overflow-y: auto;
-        }
-
-        .category-item {
-            padding: 10px 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: background-color 0.2s ease;
-            border-bottom: 1px solid #f8f9fa;
-        }
-
-        .category-item:hover {
-            background: #e3f2fd;
-        }
-
-        .category-item:last-child {
-            border-bottom: none;
-        }
-
-        .category-item input[type="checkbox"] {
-            transform: scale(1.05);
-            margin: 0;
-        }
-
-        .category-item label {
-            cursor: pointer;
-            user-select: none;
-            margin: 0;
-            font-size: 0.95em;
-        }
-
-        .category-item input[type="checkbox"]:checked + label {
-            color: #667eea;
-            font-weight: 500;
-        }
-
         /* 동영상 길이 섹션 스타일 */
         .video-length-section {
             background: white;
@@ -471,67 +369,13 @@
             width: 100%;
             border-collapse: collapse;
             background: white;
-            table-layout: fixed; /* 컬럼 width 고정 */
         }
-
-        /* 각 컬럼의 고정 width 설정 */
-        .results-table th:nth-child(1),
-        .results-table td:nth-child(1) {
-            width: 90px; /* 썸네일 */
-        }
-        
-        .results-table th:nth-child(2),
-        .results-table td:nth-child(2) {
-            width: 150px; /* 채널명 */
-        }
-        
-        .results-table th:nth-child(3),
-        .results-table td:nth-child(3) {
-            width: 250px; /* 영상제목 */
-        }
-        
-        .results-table th:nth-child(4),
-        .results-table td:nth-child(4) {
-            width: 120px; /* 카테고리 */
-        }
-        
-        .results-table th:nth-child(5),
-        .results-table td:nth-child(5) {
-            width: 100px; /* 업로드일 */
-        }
-        
-        .results-table th:nth-child(6),
-        .results-table td:nth-child(6) {
-            width: 100px; /* 조회수 */
-        }
-        
-        .results-table th:nth-child(7),
-        .results-table td:nth-child(7) {
-            width: 80px; /* 구독자 */
-        }
-        
-        .results-table th:nth-child(8),
-        .results-table td:nth-child(8) {
-            width: 60px; /* 링크 */
-        }
-        
-        .results-table th:nth-child(9),
-        .results-table td:nth-child(9) {
-            width: 80px; /* 재생시간 */
-        }
-        
-        .results-table th:nth-child(10),
-        .results-table td:nth-child(10) {
-            width: 60px; /* 썸네일 다운로드 */
-        }
-        
-
 
         .results-table th {
             background: #667eea;
             color: white;
             padding: 15px 12px;
-            text-align: center;
+            text-align: left;
             font-weight: 600;
             cursor: pointer;
             user-select: none;
@@ -581,64 +425,23 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .video-title {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            line-clamp: 2; /* 표준 CSS 추가 */
-            overflow: hidden;
-            text-overflow: ellipsis;
-            line-height: 1.4em;
-            max-height: 2.8em; /* line-height × 2 */
-            word-break: break-word;
-            hyphens: auto;
-        }
-
         .channel-name {
             font-weight: 600;
             color: #495057;
+            max-width: 200px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            width: 100%;
-            transition: color 0.2s ease, font-weight 0.2s ease;
-        }
-
-        .channel-link {
-            color: #667eea;
-            text-decoration: none;
-            display: block;
-            width: 100%;
-        }
-
-        .channel-link:hover {
-            text-decoration: none;
-        }
-
-        .channel-link:hover .channel-name {
-            color: #ff1493;
-            font-weight: bold;
-            text-decoration: none;
-            transition: color 0.2s ease, font-weight 0.2s ease;
-        }
-
-        .channel-link:active .channel-name {
-            color: #ff1493;
-            font-weight: bold;
         }
 
         .view-count {
             font-weight: 600;
             color: #28a745;
-            text-align: right;
-            display: block;
         }
 
         .subscriber-count {
             font-weight: 600;
             color: #dc3545;
-            text-align: center;
-            display: block;
         }
 
         .duration-time {
@@ -655,12 +458,10 @@
             color: #667eea;
             text-decoration: none;
             font-weight: 500;
-            display: block;
-            text-align: center;
         }
 
         .video-link:hover {
-            text-decoration: none;
+            text-decoration: underline;
         }
 
         .download-btn {
@@ -677,8 +478,6 @@
         .download-btn:hover {
             background: #218838;
         }
-
-
 
         .pagination {
             display: flex;
@@ -739,27 +538,6 @@
             color: #495057;
         }
 
-        /* 업로드 날짜 컬럼 두 줄 표시 */
-        .upload-date {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            line-height: 1.2;
-        }
-        
-        .upload-date .year {
-            font-weight: 600;
-            font-size: 0.9em;
-            color: #333;
-        }
-        
-        .upload-date .month-day {
-            font-weight: 600;
-            font-size: 0.9em;
-            color: #333;
-            margin-top: 2px;
-        }
-
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -809,57 +587,6 @@
             .video-length-grid .checkbox-item {
                 padding: 12px;
             }
-            
-            /* 모바일에서 컬럼 width 재조정 */
-            .results-table th:nth-child(1),
-            .results-table td:nth-child(1) {
-                width: 70px; /* 썸네일 */
-            }
-            
-            .results-table th:nth-child(2),
-            .results-table td:nth-child(2) {
-                width: 120px; /* 채널명 */
-            }
-            
-            .results-table th:nth-child(3),
-            .results-table td:nth-child(3) {
-                width: 200px; /* 영상제목 */
-            }
-            
-            .results-table th:nth-child(4),
-            .results-table td:nth-child(4) {
-                width: 100px; /* 카테고리 */
-            }
-            
-            .results-table th:nth-child(5),
-            .results-table td:nth-child(5) {
-                width: 80px; /* 업로드일 */
-            }
-            
-            .results-table th:nth-child(6),
-            .results-table td:nth-child(6) {
-                width: 90px; /* 조회수 */
-            }
-            
-            .results-table th:nth-child(7),
-            .results-table td:nth-child(7) {
-                width: 70px; /* 구독자 */
-            }
-            
-            .results-table th:nth-child(8),
-            .results-table td:nth-child(8) {
-                width: 50px; /* 링크 */
-            }
-            
-            .results-table th:nth-child(9),
-            .results-table td:nth-child(9) {
-                width: 70px; /* 재생시간 */
-            }
-            
-            .results-table th:nth-child(10),
-            .results-table td:nth-child(10) {
-                width: 50px; /* 썸네일 다운로드 */
-            }
         }
     </style>
 </head>
@@ -875,8 +602,8 @@
                 <div class="form-group">
                     <label for="country">국가</label>
                     <select id="country" name="country">
-                        <option value="worldwide">전세계 (Worldwide)</option>
-                        <option value="korea" selected>대한민국 (Korea)</option>
+                        <option value="worldwide" selected>전세계 (Worldwide)</option>
+                        <option value="korea">대한민국 (Korea)</option>
                         <option value="usa">미국 (USA)</option>
                         <option value="japan">일본 (Japan)</option>
                         <option value="china">중국 (China)</option>
@@ -900,109 +627,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="searchScope">검색 범위</label>
-                    <div class="category-selector">
-                        <div class="category-display" id="searchScopeDisplay">영상제목 선택됨</div>
-                        <div class="category-dropdown" id="searchScopeDropdown">
-                            <div class="category-header">
-                                <input type="checkbox" id="selectAllSearchScope">
-                                <label for="selectAllSearchScope">모든 범위</label>
-                            </div>
-                            <div class="category-options">
-                                <div class="category-item">
-                                    <input type="checkbox" id="searchTitle" name="searchScope" value="title" checked>
-                                    <label for="searchTitle">영상제목</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="searchChannel" name="searchScope" value="channel">
-                                    <label for="searchChannel">채널명</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <label for="minViews">최소 조회수</label>
+                    <input type="number" id="minViews" name="minViews" value="100000" placeholder="100000">
                 </div>
 
                 <div class="form-group">
-                    <label for="viewRange">조회수</label>
-                    <div class="date-range-container">
-                        <div class="date-input-group">
-                            <input type="number" id="minViews" name="minViews" value="100000" placeholder="최소 조회수" />
-                        </div>
-                        <div class="date-input-group">
-                            <input type="number" id="maxViews" name="maxViews" placeholder="최대 조회수" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="categories">카테고리</label>
-                    <div class="category-selector">
-                        <div class="category-display" id="categoryDisplay">모든 카테고리 선택됨</div>
-                        <div class="category-dropdown" id="categoryDropdown">
-                            <div class="category-header">
-                                <input type="checkbox" id="selectAllCategories" checked>
-                                <label for="selectAllCategories">모든 카테고리</label>
-                            </div>
-                            <div class="category-options">
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat1" name="categories" value="1" checked>
-                                    <label for="cat1">Film & Animation</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat2" name="categories" value="2" checked>
-                                    <label for="cat2">Autos & Vehicles</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat10" name="categories" value="10" checked>
-                                    <label for="cat10">Music</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat15" name="categories" value="15" checked>
-                                    <label for="cat15">Pets & Animals</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat17" name="categories" value="17" checked>
-                                    <label for="cat17">Sports</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat19" name="categories" value="19" checked>
-                                    <label for="cat19">Travel & Events</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat20" name="categories" value="20" checked>
-                                    <label for="cat20">Gaming</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat22" name="categories" value="22" checked>
-                                    <label for="cat22">People & Blogs</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat23" name="categories" value="23" checked>
-                                    <label for="cat23">Comedy</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat24" name="categories" value="24" checked>
-                                    <label for="cat24">Entertainment</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat25" name="categories" value="25" checked>
-                                    <label for="cat25">News & Politics</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat26" name="categories" value="26" checked>
-                                    <label for="cat26">Howto & Style</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat27" name="categories" value="27" checked>
-                                    <label for="cat27">Education</label>
-                                </div>
-                                <div class="category-item">
-                                    <input type="checkbox" id="cat28" name="categories" value="28" checked>
-                                    <label for="cat28">Science & Technology</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <label for="maxViews">최대 조회수</label>
+                    <input type="number" id="maxViews" name="maxViews" placeholder="제한 없음">
                 </div>
 
                 <div class="form-group">
@@ -1062,11 +693,11 @@
                     <label class="section-label">동영상 길이</label>
                     <div class="select-controls">
                         <div class="select-all-container">
-                            <input type="checkbox" id="selectAllVideoLength">
+                            <input type="checkbox" id="selectAllVideoLength" checked>
                             <label for="selectAllVideoLength">모두 선택</label>
                         </div>
                         <div class="select-group-container">
-                            <input type="checkbox" id="selectFirst2VideoLength" checked>
+                            <input type="checkbox" id="selectFirst2VideoLength">
                             <label for="selectFirst2VideoLength">맨 앞 두 개만</label>
                         </div>
                         <div class="select-group-container">
@@ -1093,15 +724,15 @@
                         <label for="shortForm2">Short Form2<br><span class="duration-desc">(1분 이상 2분 미만)</span></label>
                     </div>
                     <div class="checkbox-item">
-                        <input type="checkbox" id="midForm1" name="videoLength" value="mid1">
+                        <input type="checkbox" id="midForm1" name="videoLength" value="mid1" checked>
                         <label for="midForm1">Mid Form1<br><span class="duration-desc">(2분 이상 10분 미만)</span></label>
                     </div>
                     <div class="checkbox-item">
-                        <input type="checkbox" id="midForm2" name="videoLength" value="mid2">
+                        <input type="checkbox" id="midForm2" name="videoLength" value="mid2" checked>
                         <label for="midForm2">Mid Form2<br><span class="duration-desc">(10분 이상 20분 미만)</span></label>
                     </div>
                     <div class="checkbox-item">
-                        <input type="checkbox" id="longForm1" name="videoLength" value="long1">
+                        <input type="checkbox" id="longForm1" name="videoLength" value="long1" checked>
                         <label for="longForm1">Long Form1<br><span class="duration-desc">(20분 이상 30분 미만)</span></label>
                     </div>
                     <div class="checkbox-item">
@@ -2268,240 +1899,11 @@
             }
         }
 
-        // 검색 범위 드롭다운 기능
-        document.getElementById('searchScopeDisplay').addEventListener('click', () => {
-            const dropdown = document.getElementById('searchScopeDropdown');
-            dropdown.classList.toggle('show');
-        });
-
-        // 모든 검색 범위 선택/해제
-        document.getElementById('selectAllSearchScope').addEventListener('change', (e) => {
-            const isChecked = e.target.checked;
-            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]');
-            
-            searchScopeCheckboxes.forEach(checkbox => {
-                checkbox.checked = isChecked;
-            });
-            
-            updateSearchScopeDisplay();
-        });
-
-        // 개별 검색 범위 체크박스 이벤트
-        document.querySelectorAll('input[name="searchScope"]').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                updateSelectAllSearchScope();
-                updateSearchScopeDisplay();
-            });
-        });
-
-        // 검색 범위 디스플레이 업데이트 함수
-        function updateSearchScopeDisplay() {
-            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]:checked');
-            const display = document.getElementById('searchScopeDisplay');
-            
-            if (searchScopeCheckboxes.length === 0) {
-                display.textContent = '검색 범위를 선택해주세요';
-            } else if (searchScopeCheckboxes.length === document.querySelectorAll('input[name="searchScope"]').length) {
-                display.textContent = '모든 범위 선택됨';
-            } else {
-                const selectedNames = Array.from(searchScopeCheckboxes).map(cb => {
-                    const label = cb.parentElement.querySelector('label');
-                    return label.textContent;
-                });
-                display.textContent = selectedNames.join(', ') + ' 선택됨';
-            }
-        }
-
-        // 모든 검색 범위 체크박스 상태 업데이트
-        function updateSelectAllSearchScope() {
-            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]');
-            const checkedSearchScope = document.querySelectorAll('input[name="searchScope"]:checked');
-            const selectAllCheckbox = document.getElementById('selectAllSearchScope');
-            
-            if (checkedSearchScope.length === 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            } else if (checkedSearchScope.length === searchScopeCheckboxes.length) {
-                selectAllCheckbox.checked = true;
-                selectAllCheckbox.indeterminate = false;
-            } else {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = true;
-            }
-        }
-
-        // 검색 범위 드롭다운 기능
-        document.getElementById('searchScopeDisplay').addEventListener('click', () => {
-            const dropdown = document.getElementById('searchScopeDropdown');
-            dropdown.classList.toggle('show');
-        });
-
-        // 모든 검색 범위 선택/해제
-        document.getElementById('selectAllSearchScope').addEventListener('change', (e) => {
-            const isChecked = e.target.checked;
-            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]');
-            
-            searchScopeCheckboxes.forEach(checkbox => {
-                checkbox.checked = isChecked;
-            });
-            
-            updateSearchScopeDisplay();
-        });
-
-        // 개별 검색 범위 체크박스 이벤트
-        document.querySelectorAll('input[name="searchScope"]').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                updateSelectAllSearchScope();
-                updateSearchScopeDisplay();
-            });
-        });
-
-        // 검색 범위 디스플레이 업데이트 함수
-        function updateSearchScopeDisplay() {
-            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]:checked');
-            const display = document.getElementById('searchScopeDisplay');
-            
-            if (searchScopeCheckboxes.length === 0) {
-                display.textContent = '검색 범위를 선택해주세요';
-            } else if (searchScopeCheckboxes.length === document.querySelectorAll('input[name="searchScope"]').length) {
-                display.textContent = '모든 범위 선택됨';
-            } else {
-                const selectedNames = Array.from(searchScopeCheckboxes).map(cb => {
-                    const label = cb.parentElement.querySelector('label');
-                    return label.textContent;
-                });
-                display.textContent = selectedNames.join(', ') + ' 선택됨';
-            }
-        }
-
-        // 모든 검색 범위 체크박스 상태 업데이트
-        function updateSelectAllSearchScope() {
-            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]');
-            const checkedSearchScope = document.querySelectorAll('input[name="searchScope"]:checked');
-            const selectAllCheckbox = document.getElementById('selectAllSearchScope');
-            
-            if (checkedSearchScope.length === 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            } else if (checkedSearchScope.length === searchScopeCheckboxes.length) {
-                selectAllCheckbox.checked = true;
-                selectAllCheckbox.indeterminate = false;
-            } else {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = true;
-            }
-        }
-
-        // 카테고리 드롭다운 기능
-        document.getElementById('categoryDisplay').addEventListener('click', () => {
-            const dropdown = document.getElementById('categoryDropdown');
-            dropdown.classList.toggle('show');
-        });
-
-        // 문서 클릭 시 드롭다운 닫기
-        document.addEventListener('click', (e) => {
-            // 검색 범위 드롭다운 처리
-            const searchScopeSelector = document.querySelector('.category-selector');
-            const searchScopeDropdown = document.getElementById('searchScopeDropdown');
-            
-            if (searchScopeSelector && !searchScopeSelector.contains(e.target)) {
-                searchScopeDropdown.classList.remove('show');
-            }
-            
-            // 카테고리 드롭다운 처리 (두 번째 category-selector)
-            const allCategorySelectors = document.querySelectorAll('.category-selector');
-            if (allCategorySelectors.length > 1) {
-                const categorySelector = allCategorySelectors[1];
-                const categoryDropdown = document.getElementById('categoryDropdown');
-                
-                if (!categorySelector.contains(e.target)) {
-                    categoryDropdown.classList.remove('show');
-                }
-            }
-        });
-
-        // 모든 카테고리 선택/해제
-        document.getElementById('selectAllCategories').addEventListener('change', (e) => {
-            const isChecked = e.target.checked;
-            const categoryCheckboxes = document.querySelectorAll('input[name="categories"]');
-            
-            categoryCheckboxes.forEach(checkbox => {
-                checkbox.checked = isChecked;
-            });
-            
-            updateCategoryDisplay();
-        });
-
-        // 개별 카테고리 체크박스 이벤트
-        document.querySelectorAll('input[name="categories"]').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                updateSelectAllCategories();
-                updateCategoryDisplay();
-            });
-        });
-
-        // 카테고리 디스플레이 업데이트 함수
-        function updateCategoryDisplay() {
-            const categoryCheckboxes = document.querySelectorAll('input[name="categories"]:checked');
-            const display = document.getElementById('categoryDisplay');
-            
-            if (categoryCheckboxes.length === 0) {
-                display.textContent = '카테고리를 선택해주세요';
-            } else if (categoryCheckboxes.length === document.querySelectorAll('input[name="categories"]').length) {
-                display.textContent = '모든 카테고리 선택됨';
-            } else if (categoryCheckboxes.length <= 3) {
-                const selectedNames = Array.from(categoryCheckboxes).map(cb => {
-                    const label = cb.parentElement.querySelector('label');
-                    return label.textContent;
-                });
-                display.textContent = selectedNames.join(', ');
-            } else {
-                display.textContent = `${categoryCheckboxes.length}개 카테고리 선택됨`;
-            }
-        }
-
-        // 모든 카테고리 체크박스 상태 업데이트
-        function updateSelectAllCategories() {
-            const categoryCheckboxes = document.querySelectorAll('input[name="categories"]');
-            const checkedCategories = document.querySelectorAll('input[name="categories"]:checked');
-            const selectAllCheckbox = document.getElementById('selectAllCategories');
-            
-            if (checkedCategories.length === 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            } else if (checkedCategories.length === categoryCheckboxes.length) {
-                selectAllCheckbox.checked = true;
-                selectAllCheckbox.indeterminate = false;
-            } else {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = true;
-            }
-        }
-
         // 페이지 로드 시 초기화
         document.addEventListener('DOMContentLoaded', () => {
             console.log('YouTube 채널 검색 시스템이 준비되었습니다.');
             checkDownloadSupport();
             showDownloadInfo();
-            
-            // 카테고리 체크박스 이벤트 리스너 추가
-            document.getElementById('selectAllCategories').addEventListener('change', (e) => {
-                const isChecked = e.target.checked;
-                const categoryCheckboxes = document.querySelectorAll('input[name="categories"]');
-                
-                categoryCheckboxes.forEach(checkbox => {
-                    checkbox.checked = isChecked;
-                });
-                
-                updateCategoryDisplay();
-            });
-            
-            document.querySelectorAll('input[name="categories"]').forEach(checkbox => {
-                checkbox.addEventListener('change', () => {
-                    updateSelectAllCategories();
-                    updateCategoryDisplay();
-                });
-            });
         });
     </script>
 </body>
