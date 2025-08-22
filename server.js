@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { google } = require('googleapis');
 const axios = require('axios');
 const XLSX = require('xlsx');
@@ -25,6 +26,7 @@ class ApiKeyManager {
     this.currentKeyIndex = 0;
     this.keyUsageCount = {};
     this.keyQuotaExceeded = {};
+    this.statusFile = path.join(__dirname, 'api_key_status.json');
     
     // API 키들을 환경변수에서 수집
     const maxKeys = parseInt(process.env.MAX_API_KEYS) || 10;
@@ -60,6 +62,9 @@ class ApiKeyManager {
     this.apiKeys.forEach((keyInfo, index) => {
       console.log(`   ${index + 1}. ${keyInfo.name} (***${keyInfo.key.slice(-4)})`);
     });
+    
+    // 저장된 상태 로드
+    this.loadKeyStatus();
   }
   
   // 현재 사용 가능한 API 키 반환 - 개선된 로직
@@ -102,6 +107,11 @@ class ApiKeyManager {
     
     console.log(`🔑 사용 중인 API 키: ${currentKey.name} (사용횟수: ${currentKey.usageCount})`);
     
+    // 사용량 변경 저장 (주기적으로)
+    if (currentKey.usageCount % 5 === 0) {
+      this.saveKeyStatus();
+    }
+    
     return google.youtube({ version: 'v3', auth: currentKey.key });
   }
   
@@ -127,6 +137,9 @@ class ApiKeyManager {
       }
     }
     
+    // 상태 변경 저장
+    this.saveKeyStatus();
+    
     // 다음 사용 가능한 키 찾기
     const nextKey = this.getCurrentKey();
     
@@ -144,6 +157,7 @@ class ApiKeyManager {
     if (currentKey && currentKey.consecutiveErrors > 0) {
       console.log(`✅ ${currentKey.name} 성공, 연속 오류 카운터 리셋`);
       currentKey.consecutiveErrors = 0;
+      this.saveKeyStatus();
     }
   }
   
@@ -174,6 +188,88 @@ class ApiKeyManager {
     }
     
     return null;
+  }
+  
+  // 상태 파일에서 API 키 상태 로드
+  loadKeyStatus() {
+    try {
+      if (fs.existsSync(this.statusFile)) {
+        const status = JSON.parse(fs.readFileSync(this.statusFile, 'utf8'));
+        const today = new Date().toDateString();
+        
+        // 당일이 아니면 상태 리셋 (일일 할당량 갱신)
+        if (status.date !== today) {
+          console.log(`📅 날짜 변경 감지 (${status.date} → ${today}), API 키 상태 리셋`);
+          this.resetDailyStatus();
+        } else {
+          console.log(`🔄 저장된 API 키 상태 로드 (${status.date})`);
+          this.restoreKeyStatus(status);
+        }
+      } else {
+        console.log(`📝 API 키 상태 파일이 없음, 새로 생성`);
+        this.saveKeyStatus();
+      }
+    } catch (error) {
+      console.error('⚠️ 상태 파일 로드 실패:', error.message);
+      console.log('💡 기본 상태로 진행합니다.');
+    }
+  }
+  
+  // 저장된 상태를 API 키에 복원
+  restoreKeyStatus(status) {
+    status.keys.forEach(savedKey => {
+      const apiKey = this.apiKeys.find(key => key.index === savedKey.index);
+      if (apiKey) {
+        apiKey.quotaExceeded = savedKey.quotaExceeded;
+        apiKey.usageCount = savedKey.usageCount;
+        apiKey.consecutiveErrors = savedKey.consecutiveErrors || 0;
+        if (savedKey.lastUsed) {
+          apiKey.lastUsed = new Date(savedKey.lastUsed);
+        }
+        
+        // 레거시 추적 객체도 업데이트
+        this.keyUsageCount[apiKey.index] = apiKey.usageCount;
+        this.keyQuotaExceeded[apiKey.index] = apiKey.quotaExceeded;
+      }
+    });
+    
+    const exceededCount = this.apiKeys.filter(key => key.quotaExceeded).length;
+    const availableCount = this.apiKeys.length - exceededCount;
+    console.log(`📊 상태 복원 완료: ${availableCount}/${this.apiKeys.length} 키 사용 가능`);
+  }
+  
+  // 일일 상태 리셋
+  resetDailyStatus() {
+    this.apiKeys.forEach(key => {
+      key.quotaExceeded = false;
+      key.consecutiveErrors = 0;
+      // usageCount와 lastUsed는 유지 (통계 목적)
+    });
+    this.saveKeyStatus();
+    console.log(`🔄 모든 API 키 상태가 리셋되었습니다.`);
+  }
+  
+  // 현재 상태를 파일에 저장
+  saveKeyStatus() {
+    try {
+      const status = {
+        date: new Date().toDateString(),
+        lastUpdated: new Date().toISOString(),
+        keys: this.apiKeys.map(key => ({
+          index: key.index,
+          name: key.name,
+          quotaExceeded: key.quotaExceeded,
+          usageCount: key.usageCount,
+          consecutiveErrors: key.consecutiveErrors,
+          lastUsed: key.lastUsed ? key.lastUsed.toISOString() : null
+        }))
+      };
+      
+      fs.writeFileSync(this.statusFile, JSON.stringify(status, null, 2), 'utf8');
+      console.log(`💾 API 키 상태 저장 완료: ${this.statusFile}`);
+    } catch (error) {
+      console.error('⚠️ 상태 파일 저장 실패:', error.message);
+    }
   }
   
   // 사용 통계 출력
@@ -413,13 +509,17 @@ class ElasticsearchHelper {
         });
       });
       
-      const response = await this.client.bulk({ body });
-      
-      if (response.body.errors) {
-        console.error('ES bulk upsert errors:', response.body.items.filter(item => item.update && item.update.error));
-      } else {
-        console.log(`ES bulk upsert 성공: ${videos.length}개 비디오 인덱싱`);
-      }
+              const response = await this.client.bulk({ body });
+        
+        // 응답 구조 검증 및 안전한 오류 처리
+        if (response && response.body && response.body.errors) {
+          console.error('ES bulk upsert errors:', response.body.items.filter(item => item.update && item.update.error));
+        } else if (response && response.errors) {
+          // 새로운 버전의 클라이언트 응답 구조
+          console.error('ES bulk upsert errors:', response.items.filter(item => item.update && item.update.error));
+        } else {
+          console.log(`ES bulk upsert 성공: ${videos.length}개 비디오 인덱싱`);
+        }
       
     } catch (error) {
       console.error('ES bulk upsert error:', error);
@@ -447,6 +547,8 @@ app.get('/', (req, res) => {
 
 // YouTube 동영상 검색 API
 app.get('/api/search', async (req, res) => {
+  const searchStartTime = Date.now(); // 검색 시작 시간 기록
+  
   try {
     const {
       country = 'worldwide',  // 기본값을 전세계로 변경
@@ -498,11 +600,23 @@ app.get('/api/search', async (req, res) => {
       
       if (cachedResults && cachedResults.length > 0) {
         console.log(`📦 캐시에서 ${cachedResults.length}개 결과 반환`);
+        
+        // 캐시 검색 소요시간 계산
+        const cacheEndTime = Date.now();
+        const cacheDuration = cacheEndTime - searchStartTime;
+        const cacheDurationSeconds = (cacheDuration / 1000).toFixed(2);
+        
+        console.log(`\n⏱️ 캐시 검색 완료: 총 소요시간 ${cacheDurationSeconds}초 (${cachedResults.length}개 결과)`);
+        console.log(`🔍 검색 조건: ${country}/${keyword || '키워드 없음'}/${finalMaxResults}건`);
+        console.log('⚡ 캐시 히트로 초고속 검색!');
+        console.log('='.repeat(52));
+        
         return res.json({
           success: true,
           data: cachedResults,
           total: cachedResults.length,
-          source: 'elasticsearch_cache'
+          source: 'elasticsearch_cache',
+          searchDuration: `${cacheDurationSeconds}초`
         });
       } else {
         console.log('⚠️ 캐시 히트였지만 결과가 없음, YouTube API로 fallback');
@@ -548,24 +662,6 @@ app.get('/api/search', async (req, res) => {
       searchParams.relevanceLanguage = languageCode;
       console.log(`🌐 언어 설정: ${country} → ${languageCode}`);
     }
-
-    console.log('=== 국가별 검색 디버그 정보 ===');
-    console.log('1. 클라이언트 요청 country:', country);
-    console.log('2. getCountryCode 결과:', getCountryCode(country));
-    console.log('3. getLanguageCode 결과:', getLanguageCode(country));
-    console.log('4. 키워드 상태:', keyword ? `"${keyword}"` : '없음 (국가별 인기 검색)');
-    console.log('5. 검색 전략:', keyword ? '키워드 기반 검색' : (country === 'worldwide' ? '전세계 인기 검색' : `${country} 국가별 인기 검색`));
-    console.log('6. 최종 YouTube API 검색 파라미터:', {
-      regionCode: searchParams.regionCode || '없음 (전세계 검색)',
-      relevanceLanguage: searchParams.relevanceLanguage,
-      country: country,
-      keyword: searchParams.q || '키워드 없음',
-      order: searchParams.order,
-      type: searchParams.type,
-      isWorldwide: country === 'worldwide'
-    });
-    console.log('7. 검색 타입:', country === 'worldwide' ? '🌍 전세계 검색' : `🏳️ ${country} 국가별 검색`);
-    console.log('===========================');
 
     // 키워드 설정
     const isEmptyKeyword = !keyword || !keyword.trim();
@@ -622,6 +718,25 @@ app.get('/api/search', async (req, res) => {
         console.log('설정: 조회수 높은 순서로 정렬');
       }
     }
+
+    // 디버그 로그 출력 (키워드 설정 후)
+    console.log('=== 국가별 검색 디버그 정보 ===');
+    console.log('1. 클라이언트 요청 country:', country);
+    console.log('2. getCountryCode 결과:', getCountryCode(country));
+    console.log('3. getLanguageCode 결과:', getLanguageCode(country));
+    console.log('4. 키워드 상태:', keyword ? `"${keyword}"` : '없음 (국가별 인기 검색)');
+    console.log('5. 검색 전략:', keyword ? '키워드 기반 검색' : (country === 'worldwide' ? '전세계 인기 검색' : `${country} 국가별 인기 검색`));
+    console.log('6. 최종 YouTube API 검색 파라미터:', {
+      regionCode: searchParams.regionCode || '없음 (전세계 검색)',
+      relevanceLanguage: searchParams.relevanceLanguage,
+      country: country,
+      keyword: searchParams.q || '키워드 없음',
+      order: searchParams.order,
+      type: searchParams.type,
+      isWorldwide: country === 'worldwide'
+    });
+    console.log('7. 검색 타입:', country === 'worldwide' ? '🌍 전세계 검색' : `🏳️ ${country} 국가별 검색`);
+    console.log('========================================');
 
     // 업로드 기간 설정 (기존 드롭다운 방식)
     if (uploadPeriod) {
@@ -898,28 +1013,46 @@ app.get('/api/search', async (req, res) => {
      // API 키 사용 통계 출력
      apiKeyManager.printUsageStats();
 
-    // ========== YouTube API 결과를 Elasticsearch에 인덱싱 ==========
-    if (searchResults.length > 0) {
-      console.log('📝 YouTube API 결과를 Elasticsearch에 인덱싱 중...');
-      try {
-        await esHelper.bulkUpsertVideos(searchResults, searchParameters);
-        console.log('✅ Elasticsearch 인덱싱 완료');
-      } catch (esError) {
-        console.error('⚠️ Elasticsearch 인덱싱 실패:', esError.message);
-        console.log('💡 YouTube API 결과는 정상 반환하지만 캐시 저장은 실패했습니다.');
-      }
-    }
-    // ========== Elasticsearch 인덱싱 끝 ==========
+     // ========== YouTube API 결과를 Elasticsearch에 인덱싱 ==========
+     if (searchResults.length > 0) {
+     console.log('📝 YouTube API 결과를 Elasticsearch에 인덱싱 중...');
+     try {
+     await esHelper.bulkUpsertVideos(searchResults, searchParameters);
+     console.log('✅ Elasticsearch 인덱싱 완료');
+     } catch (esError) {
+     console.error('⚠️ Elasticsearch 인덱싱 실패:', esError.message);
+     console.log('💡 YouTube API 결과는 정상 반환하지만 캐시 저장은 실패했습니다.');
+     }
+     }
+     // ========== Elasticsearch 인덱싱 끝 ==========
+
+     // 검색 소요시간 계산 및 출력
+     const searchEndTime = Date.now();
+     const searchDuration = searchEndTime - searchStartTime;
+     const durationSeconds = (searchDuration / 1000).toFixed(2);
+     
+     console.log(`\n⏱️ 검색 완료: 총 소요시간 ${durationSeconds}초 (${searchResults.length}개 결과)`);
+    console.log(`🔍 검색 조건: ${country}/${keyword || '키워드 없음'}/${finalMaxResults}건`);
+    console.log('='.repeat(52));
 
     res.json({
       success: true,
       data: searchResults,
       total: searchResults.length,
-      source: 'youtube_api_with_es_cache'
+      source: 'youtube_api_with_es_cache',
+      searchDuration: `${durationSeconds}초`
     });
 
   } catch (error) {
     console.error('검색 오류:', error);
+    
+    // 오류 발생 시에도 소요시간 출력
+    const errorEndTime = Date.now();
+    const errorDuration = errorEndTime - searchStartTime;
+    const errorDurationSeconds = (errorDuration / 1000).toFixed(2);
+    
+    console.log(`\n⚠️ 검색 실패: 소요시간 ${errorDurationSeconds}초`);
+    console.log('='.repeat(52));
     
     // API 키 사용 통계 출력 (오류 발생 시에도)
     apiKeyManager.printUsageStats();
@@ -981,27 +1114,7 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// 썸네일 다운로드 API
-app.get('/api/download-thumbnail', async (req, res) => {
-  try {
-    const { url, filename } = req.query;
-    
-    if (!url) {
-      return res.status(400).json({ error: 'URL이 필요합니다.' });
-    }
-
-    const response = await axios.get(url, { responseType: 'stream' });
-    
-    res.setHeader('Content-Disposition', `attachment; filename="${filename || 'thumbnail.jpg'}"`);
-    res.setHeader('Content-Type', 'image/jpeg');
-    
-    response.data.pipe(res);
-
-  } catch (error) {
-    console.error('썸네일 다운로드 오류:', error);
-    res.status(500).json({ error: '썸네일 다운로드에 실패했습니다.' });
-  }
-});
+// 썸네일 다운로드 API는 아래에 개선된 버전이 있습니다.
 
 // Excel 다운로드 API
 app.post('/api/download-excel', async (req, res) => {
@@ -1134,14 +1247,11 @@ function formatSubscriberCountForExcel(count) {
   const inTenThousands = number / 10000;
   
   if (number < 10000) {
-    // 1만 미만인 경우 소수점 표시
+    // 1만 미만인 경우 소수점 2자리 표시
     return inTenThousands.toFixed(2);
-  } else if (number < 100000) {
-    // 1만 이상 10만 미만인 경우 소수점 1자리
-    return inTenThousands.toFixed(1);
   } else {
-    // 10만 이상인 경우 정수로 표시
-    return Math.round(inTenThousands).toString();
+    // 1만 이상인 경우 소수점 1자리 표시 (100만 이상도 포함)
+    return inTenThousands.toFixed(1);
   }
 }
 
@@ -1376,6 +1486,108 @@ async function getCategoryName(categoryId) {
     return 'Other';
   }
 }
+
+// 썸네일 다운로드 API (ERR_INVALID_CHAR 오류 해결)
+app.get('/api/download-thumbnail', async (req, res) => {
+try {
+const { url, filename } = req.query;
+
+console.log('📥 썸네일 다운로드 요청:', { url, filename });
+
+if (!url) {
+      return res.status(400).json({ error: 'URL이 필요합니다.' });
+}
+
+// 파일명 안전하게 처리 (ERR_INVALID_CHAR 오류 방지)
+let safeFilename = filename || 'thumbnail.jpg';
+
+// 파일명이 이미 안전한지 확인하는 함수
+function isFilenameSafe(fname) {
+  // ASCII가 아닌 문자, 특수문자, 제어문자 등 확인
+    const unsafePattern = /[^\x20-\x7E]|[<>:"/\\|?*\x00-\x1f]/;
+    return !unsafePattern.test(fname) && fname.length <= 100 && fname.trim() === fname;
+}
+
+// 파일명이 이미 안전하다면 변환하지 않음
+if (isFilenameSafe(safeFilename)) {
+console.log('✅ 파일명이 이미 안전함:', safeFilename);
+} else {
+  console.log('🔧 파일명 변환 필요:', { original: safeFilename });
+  
+  // 특수문자 및 유니코드 문자 제거/변경
+safeFilename = safeFilename
+    .normalize('NFD')                          // 유니코드 정규화
+    .replace(/[\u0300-\u036f]/g, '')          // 발음 기호 제거
+    .replace(/[^\x00-\x7F]/g, '')             // ASCII가 아닌 문자 제거 (한글, 이모지 등)
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')   // 파일명에 사용 불가한 문자들 제거
+  .replace(/["'`]/g, '')                    // 따옴표 제거
+    .replace(/\s+/g, '_')                     // 공백을 언더스코어로 변경
+    .replace(/_{2,}/g, '_')                   // 연속된 언더스코어를 하나로 변경
+    .replace(/^_+|_+$/g, '')                  // 앞뒤 언더스코어 제거
+        .substring(0, 100);                       // 파일명 길이 제한
+      
+      // 파일명이 비어있으면 기본값 설정
+      if (!safeFilename || safeFilename.length === 0) {
+        safeFilename = 'thumbnail';
+      }
+      
+      // 파일 확장자 확인 및 추가
+      if (!safeFilename.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/)) {
+        safeFilename += '.jpg';
+      }
+      
+      console.log('🔧 파일명 변환 완료:', { original: filename, safe: safeFilename });
+    }
+
+    const response = await axios.get(url, { 
+      responseType: 'stream',
+      timeout: 10000  // 10초 타임아웃
+    });
+    
+    // 안전한 파일명만 헤더에 설정
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Content-Length', response.headers['content-length'] || '');
+    
+    response.data.pipe(res);
+
+    console.log(`✅ 썸네일 다운로드 성공: ${safeFilename}`);
+
+  } catch (error) {
+    console.error('썸네일 다운로드 오류:', error);
+    
+    // 구체적인 오류 처리
+    if (error.code === 'ERR_INVALID_CHAR') {
+      console.error('❌ Content-Disposition 헤더 오류:', {
+        originalFilename: req.query.filename,
+        url: req.query.url,
+        error: error.message
+      });
+      res.status(400).json({ 
+        error: '파일명에 사용할 수 없는 문자가 포함되어 있습니다.',
+        details: 'Invalid characters in filename for HTTP header'
+      });
+    } else if (error.response) {
+      console.error('❌ 외부 서버 오류:', error.response.status, error.response.statusText);
+      res.status(502).json({ 
+        error: '썸네일 서버에서 이미지를 가져올 수 없습니다.',
+        details: `HTTP ${error.response.status}: ${error.response.statusText}`
+      });
+    } else if (error.request) {
+      console.error('❌ 네트워크 오류:', error.message);
+      res.status(503).json({ 
+        error: '네트워크 오류로 썸네일 다운로드에 실패했습니다.',
+        details: 'Network timeout or connection error'
+      });
+    } else {
+      console.error('❌ 알 수 없는 오류:', error.message);
+      res.status(500).json({ 
+        error: '썸네일 다운로드에 실패했습니다.',
+        details: error.message
+      });
+    }
+  }
+});
 
 // 서버 시작
 app.listen(PORT, () => {

@@ -1146,7 +1146,7 @@
                 </div>
                 <div class="results-controls">
                     <div class="pagination-controls">
-                        <label>페이지당 표시:</label>
+                        <label>(구독자수: 만 단위) &nbsp;&nbsp;페이지당 표시:</label>
                         <select id="itemsPerPage">
                             <option value="10">10개</option>
                             <option value="20">20개</option>
@@ -1168,17 +1168,16 @@
                 <table class="results-table">
                     <thead>
                         <tr>
-                            <th data-sort="thumbnail_url">썸네일</th>
+                            <th data-sort="thumbnail_url">👍</th>
                             <th data-sort="youtube_channel_name" class="sortable">채널명</th>
-                            <th data-sort="status" class="sortable">상태</th>
-                            <th data-sort="youtube_channel_id" class="sortable">채널 ID</th>
+                            <th data-sort="title" class="sortable">영상제목</th>
                             <th data-sort="primary_category" class="sortable">카테고리</th>
-                            <th data-sort="status_date" class="sortable">업로드일</th>
-                            <th data-sort="daily_view_count" class="sortable">조회수</th>
-                            <th data-sort="subscriber_count" class="sortable">구독(만)</th>
-                            <th data-sort="vod_url">URL</th>
-                            <th data-sort="duration" class="sortable">&nbsp; &nbsp;⏰</th>
-                            <th>&nbsp; &nbsp; &nbsp;👍</th>
+                            <th data-sort="status_date" class="sortable">🗓️</th>
+                            <th data-sort="daily_view_count" class="sortable">👓</th>
+                            <th data-sort="subscriber_count" class="sortable">👪</th>
+                            <th data-sort="vod_url">▶️</th>
+                            <th data-sort="duration" class="sortable">⏰</th>
+                            <th>👍</th>
                         </tr>
                     </thead>
                     <tbody id="resultsTableBody">
@@ -1203,6 +1202,380 @@
             e.preventDefault();
             await performSearch();
         });
+
+
+
+        // 검색 범위 드롭다운 기능
+        document.getElementById('searchScopeDisplay').addEventListener('click', () => {
+            const dropdown = document.getElementById('searchScopeDropdown');
+            dropdown.classList.toggle('show');
+        });
+
+        // 모든 검색 범위 선택/해제
+        document.getElementById('selectAllSearchScope').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]');
+            
+            searchScopeCheckboxes.forEach(checkbox => {
+                checkbox.checked = isChecked;
+            });
+            
+            updateSearchScopeDisplay();
+        });
+
+        // 개별 검색 범위 체크박스 이벤트
+        document.querySelectorAll('input[name="searchScope"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                updateSelectAllSearchScope();
+                updateSearchScopeDisplay();
+            });
+        });
+
+        // 검색 범위 디스플레이 업데이트 함수
+        function updateSearchScopeDisplay() {
+            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]:checked');
+            const display = document.getElementById('searchScopeDisplay');
+            
+            if (searchScopeCheckboxes.length === 0) {
+                display.textContent = '검색 범위를 선택해주세요';
+            } else if (searchScopeCheckboxes.length === document.querySelectorAll('input[name="searchScope"]').length) {
+                display.textContent = '모든 범위 선택됨';
+            } else {
+                const selectedNames = Array.from(searchScopeCheckboxes).map(cb => {
+                    const label = cb.parentElement.querySelector('label');
+                    return label.textContent;
+                });
+                display.textContent = selectedNames.join(', ') + ' 선택됨';
+            }
+        }
+
+        // 모든 검색 범위 체크박스 상태 업데이트
+        function updateSelectAllSearchScope() {
+            const searchScopeCheckboxes = document.querySelectorAll('input[name="searchScope"]');
+            const checkedSearchScope = document.querySelectorAll('input[name="searchScope"]:checked');
+            const selectAllCheckbox = document.getElementById('selectAllSearchScope');
+            
+            if (checkedSearchScope.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedSearchScope.length === searchScopeCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+
+        // 카테고리 드롭다운 기능
+        document.getElementById('categoryDisplay').addEventListener('click', () => {
+            const dropdown = document.getElementById('categoryDropdown');
+            dropdown.classList.toggle('show');
+        });
+
+        // 문서 클릭 시 드롭다운 닫기
+        document.addEventListener('click', (e) => {
+            // 검색 범위 드롭다운 처리
+            const searchScopeSelector = document.querySelector('.category-selector');
+            const searchScopeDropdown = document.getElementById('searchScopeDropdown');
+            
+            if (searchScopeSelector && !searchScopeSelector.contains(e.target)) {
+                searchScopeDropdown.classList.remove('show');
+            }
+            
+            // 카테고리 드롭다운 처리 (두 번째 category-selector)
+            const allCategorySelectors = document.querySelectorAll('.category-selector');
+            if (allCategorySelectors.length > 1) {
+                const categorySelector = allCategorySelectors[1];
+                const categoryDropdown = document.getElementById('categoryDropdown');
+                
+                if (!categorySelector.contains(e.target)) {
+                    categoryDropdown.classList.remove('show');
+                }
+            }
+        });
+
+        // 모든 카테고리 선택/해제
+        document.getElementById('selectAllCategories').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const categoryCheckboxes = document.querySelectorAll('input[name="categories"]');
+            
+            categoryCheckboxes.forEach(checkbox => {
+                checkbox.checked = isChecked;
+            });
+            
+            updateCategoryDisplay();
+        });
+
+        // 개별 카테고리 체크박스 이벤트
+        document.querySelectorAll('input[name="categories"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                updateSelectAllCategories();
+                updateCategoryDisplay();
+            });
+        });
+
+        // 카테고리 디스플레이 업데이트 함수
+        function updateCategoryDisplay() {
+            const categoryCheckboxes = document.querySelectorAll('input[name="categories"]:checked');
+            const display = document.getElementById('categoryDisplay');
+            
+            if (categoryCheckboxes.length === 0) {
+                display.textContent = '카테고리를 선택해주세요';
+            } else if (categoryCheckboxes.length === document.querySelectorAll('input[name="categories"]').length) {
+                display.textContent = '모든 카테고리 선택됨';
+            } else if (categoryCheckboxes.length <= 3) {
+                const selectedNames = Array.from(categoryCheckboxes).map(cb => {
+                    const label = cb.parentElement.querySelector('label');
+                    return label.textContent;
+                });
+                display.textContent = selectedNames.join(', ');
+            } else {
+                display.textContent = `${categoryCheckboxes.length}개 카테고리 선택됨`;
+            }
+        }
+
+        // 모든 카테고리 체크박스 상태 업데이트
+        function updateSelectAllCategories() {
+            const categoryCheckboxes = document.querySelectorAll('input[name="categories"]');
+            const checkedCategories = document.querySelectorAll('input[name="categories"]:checked');
+            const selectAllCheckbox = document.getElementById('selectAllCategories');
+            
+            if (checkedCategories.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCategories.length === categoryCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+
+        // 썸네일 다운로드 함수 (파일명 안전화 처리)
+        async function downloadThumbnail(url, channelName) {
+            try {
+                console.log('📥 썸네일 다운로드 시작:', { url, channelName });
+                
+                // 채널명을 안전한 파일명으로 변환 (서버 측과 동일한 로직)
+                let safeChannelName = channelName || 'channel';
+                
+                // 특수문자 및 유니코드 문자 처리
+                safeChannelName = safeChannelName
+                    .normalize('NFD')                          // 유니코드 정규화
+                    .replace(/[\u0300-\u036f]/g, '')          // 발음 기호 제거
+                    .replace(/[^\x00-\x7F]/g, '')             // ASCII가 아닌 문자 제거 (한글, 이모지 등)
+                    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')   // 파일명에 사용 불가한 문자들 제거
+                    .replace(/["'`]/g, '')                    // 따옴표 제거
+                    .replace(/\s+/g, '_')                     // 공백을 언더스코어로 변경
+                    .replace(/_{2,}/g, '_')                   // 연속된 언더스코어를 하나로 변경
+                    .replace(/^_+|_+$/g, '')                  // 앞뒤 언더스코어 제거
+                    .substring(0, 50);                       // 파일명 길이 제한 (클라이언트에서는 더 짧게)
+                
+                // 파일명이 비어있으면 기본값 설정
+                if (!safeChannelName || safeChannelName.length === 0) {
+                    safeChannelName = 'channel';
+                }
+                
+                // 현재 날짜시간을 파일명에 추가 (중복 방지)
+                const now = new Date();
+                const year = now.getFullYear().toString().slice(-2); // 뒤 2자리만 (25)
+                const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                const day = now.getDate().toString().padStart(2, '0');
+                const hour = now.getHours().toString().padStart(2, '0');
+                const minute = now.getMinutes().toString().padStart(2, '0');
+                const second = now.getSeconds().toString().padStart(2, '0');
+                const millisecond = now.getMilliseconds().toString().padStart(3, '0');
+                
+                const timestamp = `${year}${month}${day}${hour}${minute}${second}${millisecond}`;
+                const filename = `${safeChannelName}_${timestamp}.jpg`;
+                
+                console.log('🔧 파일명 변환:', { 
+                    original: channelName, 
+                    safe: safeChannelName, 
+                    final: filename 
+                });
+                
+                // 최신 브라우저에서 File System Access API 지원 확인
+                if ('showSaveFilePicker' in window) {
+                    // File System Access API 사용 (Chrome 86+, Edge 86+)
+                    await downloadWithFilePicker(url, filename);
+                } else if ('showDirectoryPicker' in window) {
+                    // Directory Picker API 사용 (대체 방법)
+                    await downloadWithDirectoryPicker(url, filename, channelName);
+                } else {
+                    // 기존 방식 (자동 다운로드) - 브라우저 호환성을 위한 fallback
+                    await downloadWithTraditionalMethod(url, filename);
+                }
+                
+            } catch (error) {
+                console.error('다운로드 오류:', error);
+                
+                // 구체적인 오류 메시지 제공
+                if (error.message.includes('Content-Disposition') || 
+                    error.message.includes('ERR_INVALID_CHAR') ||
+                    error.message.includes('Invalid character in header')) {
+                    alert(`❌ 파일명 오류: 채널명에 특수문자가 포함되어 다운로드에 실패했습니다.\n\n원인: "${channelName}"에 HTTP 헤더에서 허용되지 않는 문자가 포함되어 있습니다.\n해결: 파일명이 자동으로 안전한 형태로 변환되었지만 서버에서 처리하지 못했습니다.\n\n다시 시도해 주세요.`);
+                } else if (error.name === 'AbortError') {
+                    console.log('사용자가 다운로드를 취소했습니다.');
+                } else {
+                    alert(`❌ 썸네일 다운로드에 실패했습니다.\n\n오류: ${error.message}\n\n가능한 원인:\n- 네트워크 연결 문제\n- 썸네일 이미지 서버 접근 불가\n- 파일명 처리 오류\n\n잠시 후 다시 시도해 주세요.`);
+                }
+            }
+        }
+
+        // File System Access API를 사용한 파일 저장 (개선된 버전)
+        async function downloadWithFilePicker(url, filename) {
+            try {
+                // 파일 저장 위치 선택 다이얼로그 표시
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: filename,
+                    types: [{
+                        description: '이미지 파일',
+                        accept: {
+                            'image/jpeg': ['.jpg', '.jpeg'],
+                            'image/png': ['.png'],
+                            'image/webp': ['.webp']
+                        }
+                    }]
+                });
+
+                // URL 인코딩을 안전하게 처리
+                const encodedUrl = encodeURIComponent(url);
+                const encodedFilename = encodeURIComponent(filename);
+                
+                console.log('🔄 서버 요청:', {
+                    url: `/api/download-thumbnail?url=${encodedUrl}&filename=${encodedFilename}`,
+                    originalUrl: url,
+                    originalFilename: filename
+                });
+                
+                const response = await fetch(`/api/download-thumbnail?url=${encodedUrl}&filename=${encodedFilename}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch {
+                        errorData = { error: errorText };
+                    }
+                    throw new Error(`서버 오류 (${response.status}): ${errorData.error || 'Unknown error'}`);
+                }
+                
+                const blob = await response.blob();
+                
+                // 선택한 위치에 파일 저장
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                
+                console.log(`✅ 썸네일 저장 완료: ${filename}`);
+                alert(`✅ 썸네일이 선택한 위치에 저장되었습니다!\n\n파일명: ${filename}\n크기: ${(blob.size / 1024).toFixed(1)} KB`);
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('사용자가 저장을 취소했습니다.');
+                } else {
+                    console.error('File System Access API 다운로드 오류:', error);
+                    throw error;
+                }
+            }
+        }
+
+        // Directory Picker API를 사용한 폴더 선택 저장
+        async function downloadWithDirectoryPicker(url, filename, channelName) {
+            try {
+                // 폴더 선택 다이얼로그 표시
+                const dirHandle = await window.showDirectoryPicker();
+                
+                // 썸네일 이미지 다운로드
+                const response = await fetch(`/api/download-thumbnail?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`);
+                
+                // 서버에서 전송한 로그를 콘솔에 출력
+                const downloadLog = response.headers.get('X-Download-Log');
+                if (downloadLog) {
+                    try {
+                        const logData = JSON.parse(downloadLog);
+                        console.log(`📥 썸네일 다운로드 로그: ${logData.message}`);
+                        
+                        // 오류가 있는 경우 상세 정보 출력
+                        if (logData.step === 'error') {
+                            console.error(`❌ 썸네일 다운로드 실패: ${logData.error}`);
+                            console.error(`📋 상세 정보: ${logData.details}`);
+                            console.error(`🔗 URL: ${logData.url}`);
+                        }
+                    } catch (parseError) {
+                        console.log('📥 썸네일 다운로드 로그 파싱 실패:', parseError);
+                    }
+                }
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || 'Unknown error'}`);
+                }
+                
+                const blob = await response.blob();
+                
+                // 선택한 폴더에 파일 생성 및 저장
+                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                
+                alert(`✅ 썸네일이 선택한 폴더에 저장되었습니다!\n파일명: ${filename}`);
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('사용자가 폴더 선택을 취소했습니다.');
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        // 기존 방식 다운로드 (개선된 버전)
+        async function downloadWithTraditionalMethod(url, filename) {
+            try {
+                // URL 인코딩을 안전하게 처리
+                const encodedUrl = encodeURIComponent(url);
+                const encodedFilename = encodeURIComponent(filename);
+                
+                console.log('🔄 기존 방식 다운로드:', { filename, encodedFilename });
+                
+                // 먼저 서버에서 파일을 가져와서 오류가 있는지 확인
+                const testResponse = await fetch(`/api/download-thumbnail?url=${encodedUrl}&filename=${encodedFilename}`);
+                
+                if (!testResponse.ok) {
+                    const errorText = await testResponse.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch {
+                        errorData = { error: errorText };
+                    }
+                    throw new Error(`서버 오류 (${testResponse.status}): ${errorData.error || 'Unknown error'}`);
+                }
+                
+                // 성공한 경우 다운로드 링크 생성
+                const downloadUrl = `/api/download-thumbnail?url=${encodedUrl}&filename=${encodedFilename}`;
+                
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = filename;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                console.log(`✅ 기존 방식 다운로드 완료: ${filename}`);
+                alert(`📁 기본 다운로드 폴더에 저장됩니다.\n\n파일명: ${filename}\n위치: 브라우저 기본 다운로드 폴더\n(브라우저가 폴더 선택 기능을 지원하지 않습니다)`);
+                
+            } catch (error) {
+                console.error('기존 방식 다운로드 오류:', error);
+                throw error;
+            }
+        }
 
         // 페이지당 아이템 수 변경 이벤트
         document.getElementById('itemsPerPage').addEventListener('change', (e) => {
@@ -1404,23 +1777,7 @@
             }
         }
 
-        // 개별 체크박스에 이벤트 리스너 추가
-        document.addEventListener('DOMContentLoaded', () => {
-            const videoLengthCheckboxes = [
-                'shortForm1', 'shortForm2', 'midForm1', 'midForm2', 
-                'longForm1', 'longForm2', 'longForm3', 'longForm4', 'longForm5', 'longForm6'
-            ];
-            
-            videoLengthCheckboxes.forEach(id => {
-                const checkbox = document.getElementById(id);
-                if (checkbox) {
-                    checkbox.addEventListener('change', () => {
-                        updateSelectAllVideoLength();
-                        updateGroupCheckboxes();
-                    });
-                }
-            });
-        });
+
 
         // 검색 수행 함수
         async function performSearch() {
@@ -1528,6 +1885,20 @@
             });
             searchParams.append('videoLength', selectedLengths.join(','));
 
+            // 카테고리 체크박스 처리
+            const selectedCategories = [];
+            document.querySelectorAll('input[name="categories"]:checked').forEach(checkbox => {
+                selectedCategories.push(checkbox.value);
+            });
+            
+            console.log('📚 카테고리 디버그:', {
+                selectedCategories: selectedCategories,
+                categoryCount: selectedCategories.length,
+                joinedString: selectedCategories.join(','),
+                willSend: selectedCategories.join(',') || '빈 문자열'
+            });
+            searchParams.append('categories', selectedCategories.join(','));
+
             // 키워드 확인 및 안내 메시지
             const keyword = document.getElementById('keyword').value;
             const country = document.getElementById('country').value;
@@ -1565,6 +1936,11 @@
                                  if (data.success) {
                      searchResults = data.data;
                      currentPage = 1;
+                     
+                     // 검색 시마다 정렬을 조회수 내림차순으로 초기화
+                     sortColumn = 'daily_view_count';
+                     sortDirection = 'desc';
+                     
                      sortResults();
                      renderResults();
                      showResults();
@@ -1662,7 +2038,7 @@
             if (pageResults.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="11" class="no-results">
+                        <td colspan="10" class="no-results">
                             <h3>검색 결과가 없습니다</h3>
                             <p>다른 검색 조건으로 시도해보세요.</p>
                         </td>
@@ -1674,8 +2050,10 @@
             pageResults.forEach(result => {
                 const row = document.createElement('tr');
                 
-                const uploadDate = new Date(result.status_date).toLocaleDateString('ko-KR');
-                const viewCount = parseInt(result.daily_view_count).toLocaleString();
+                const uploadDateObj = new Date(result.status_date);
+                const year = uploadDateObj.getFullYear();
+                const monthDay = uploadDateObj.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+                const viewCount = formatViewCount(result.daily_view_count);
                 const subscriberCount = formatSubscriberCount(result.subscriber_count || 0);
                 const formattedDuration = formatDuration(result.duration_seconds);
                 
@@ -1684,14 +2062,24 @@
                         <img src="${result.thumbnail_url}" alt="썸네일" class="thumbnail">
                     </td>
                     <td>
-                        <div class="channel-name" title="${result.youtube_channel_name}">
-                            ${result.youtube_channel_name}
+                        <a href="https://www.youtube.com/channel/${result.youtube_channel_id}" target="_blank" class="channel-link" title="${result.youtube_channel_name} 채널 홈으로 이동">
+                            <div class="channel-name">
+                                ${result.youtube_channel_name}
+                            </div>
+                        </a>
+                    </td>
+                    <td>
+                        <div class="video-title" title="${result.title}">
+                            ${result.title}
                         </div>
                     </td>
-                    <td>${result.status}</td>
-                    <td>${result.youtube_channel_id}</td>
                     <td>${result.primary_category}</td>
-                    <td>${uploadDate}</td>
+                    <td>
+                        <div class="upload-date">
+                            <div class="year">${year}</div>
+                            <div class="month-day">${monthDay}</div>
+                        </div>
+                    </td>
                     <td>
                         <span class="view-count">${viewCount}</span>
                     </td>
@@ -1699,8 +2087,8 @@
                         <span class="subscriber-count">${subscriberCount}</span>
                     </td>
                     <td>
-                        <a href="${result.vod_url}" target="_blank" class="video-link">
-                            재생
+                        <a href="javascript:void(0)" onclick="openVideoWithCopy('${result.vod_url}')" class="video-link" title="동영상 열기 + URL 복사">
+                            ▶️
                         </a>
                     </td>
                     <td>
@@ -1827,106 +2215,7 @@
             });
         });
 
-        // 썸네일 다운로드 함수 (폴더 선택 기능 포함)
-        async function downloadThumbnail(url, channelName) {
-            try {
-                const filename = `${channelName.replace(/[^a-zA-Z0-9가-힣]/g, '_')}_thumbnail.jpg`;
-                
-                // 최신 브라우저에서 File System Access API 지원 확인
-                if ('showSaveFilePicker' in window) {
-                    // File System Access API 사용 (Chrome 86+, Edge 86+)
-                    await downloadWithFilePicker(url, filename);
-                } else if ('showDirectoryPicker' in window) {
-                    // Directory Picker API 사용 (대체 방법)
-                    await downloadWithDirectoryPicker(url, filename, channelName);
-                } else {
-                    // 기존 방식 (자동 다운로드) - 브라우저 호환성을 위한 fallback
-                    await downloadWithTraditionalMethod(url, filename);
-                }
-            } catch (error) {
-                console.error('다운로드 오류:', error);
-                alert('썸네일 다운로드에 실패했습니다.');
-            }
-        }
 
-        // File System Access API를 사용한 파일 저장 (위치 선택 가능)
-        async function downloadWithFilePicker(url, filename) {
-            try {
-                // 파일 저장 위치 선택 다이얼로그 표시
-                const fileHandle = await window.showSaveFilePicker({
-                    suggestedName: filename,
-                    types: [{
-                        description: '이미지 파일',
-                        accept: {
-                            'image/jpeg': ['.jpg', '.jpeg'],
-                            'image/png': ['.png'],
-                            'image/webp': ['.webp']
-                        }
-                    }]
-                });
-
-                // 썸네일 이미지 다운로드
-                const response = await fetch(`/api/download-thumbnail?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const blob = await response.blob();
-                
-                // 선택한 위치에 파일 저장
-                const writable = await fileHandle.createWritable();
-                await writable.write(blob);
-                await writable.close();
-                
-                alert(`✅ 썸네일이 선택한 위치에 저장되었습니다!`);
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    console.log('사용자가 저장을 취소했습니다.');
-                } else {
-                    throw error;
-                }
-            }
-        }
-
-        // Directory Picker API를 사용한 폴더 선택 저장
-        async function downloadWithDirectoryPicker(url, filename, channelName) {
-            try {
-                // 폴더 선택 다이얼로그 표시
-                const dirHandle = await window.showDirectoryPicker();
-                
-                // 썸네일 이미지 다운로드
-                const response = await fetch(`/api/download-thumbnail?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const blob = await response.blob();
-                
-                // 선택한 폴더에 파일 생성 및 저장
-                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(blob);
-                await writable.close();
-                
-                alert(`✅ 썸네일이 선택한 폴더에 저장되었습니다!\n파일명: ${filename}`);
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    console.log('사용자가 폴더 선택을 취소했습니다.');
-                } else {
-                    throw error;
-                }
-            }
-        }
-
-        // 기존 방식 다운로드 (브라우저 호환성 fallback)
-        async function downloadWithTraditionalMethod(url, filename) {
-            const downloadUrl = `/api/download-thumbnail?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
-            
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            alert(`📁 기본 다운로드 폴더에 저장됩니다.\n(브라우저가 폴더 선택 기능을 지원하지 않습니다)`);
-        }
 
         // UI 상태 관리 함수들
         function showLoading() {
@@ -2187,6 +2476,16 @@
             console.log(`📁 Excel 파일이 기본 다운로드 폴더에 저장됩니다: ${filename}`);
         }
 
+        // 조회수를 원래 숫자 그대로 표시하는 함수
+        function formatViewCount(count) {
+            if (!count || count === 0) {
+                return '0';
+            }
+            
+            const number = parseInt(count);
+            return number.toLocaleString();
+        }
+
         // 구독자 수를 만 단위로 변환하는 함수
         function formatSubscriberCount(count) {
             if (!count || count === 0) {
@@ -2197,21 +2496,19 @@
             const inTenThousands = number / 10000;
             
             if (number < 10000) {
-                // 1만 미만인 경우 소수점 표시
+                // 1만 미만인 경우 소수점 2자리 표시
                 return inTenThousands.toFixed(2);
-            } else if (number < 100000) {
-                // 1만 이상 10만 미만인 경우 소수점 1자리
-                return inTenThousands.toFixed(1);
             } else {
-                // 10만 이상인 경우 정수로 표시
-                return Math.round(inTenThousands).toString();
+                // 1만 이상인 경우 소수점 1자리 표시 (100만 이상도 포함)
+                return inTenThousands.toFixed(1);
             }
         }
 
         // 동영상 재생시간을 HH:MM:SS 형식으로 변환하는 함수
         function formatDuration(durationSeconds) {
             if (!durationSeconds || durationSeconds === 0) {
-                return '00:00';
+                // 0초인 경우 라이브 또는 연속 스트림으로 판단
+                return 'LIVE';
             }
             
             const hours = Math.floor(durationSeconds / 3600);
@@ -2227,45 +2524,226 @@
             }
         }
 
-        // 브라우저 다운로드 기능 지원 상태 확인
-        function checkDownloadSupport() {
-            if ('showSaveFilePicker' in window) {
-                console.log('✅ 파일 저장 위치 선택 기능 지원됨 (File System Access API)');
-                return 'full';
-            } else if ('showDirectoryPicker' in window) {
-                console.log('✅ 폴더 선택 기능 지원됨 (Directory Picker API)');
-                return 'directory';
-            } else {
-                console.log('⚠️ 폴더 선택 기능 미지원 - 기본 다운로드 방식 사용');
-                return 'traditional';
+        // 동영상 다운로드 함수 (화질 선택 모달 열기)
+        let currentVideoUrl = '';
+        let currentVideoTitle = '';
+        let selectedQuality = '';
+        
+        function downloadVideo(videoUrl, videoTitle) {
+            try {
+                currentVideoUrl = videoUrl;
+                currentVideoTitle = videoTitle;
+                
+                // 화질 선택 모달 열기
+                document.getElementById('qualityModal').style.display = 'block';
+                
+            } catch (error) {
+                console.error('동영상 다운로드 오류:', error);
+                alert('동영상 다운로드 처리 중 오류가 발생했습니다.');
             }
         }
-
-        // 사용자에게 다운로드 기능 안내
-        function showDownloadInfo() {
-            const support = checkDownloadSupport();
+        
+        // 화질 선택 함수
+        function selectQuality(quality) {
+            selectedQuality = quality;
             
-            if (support === 'traditional') {
-                // 지원하지 않는 브라우저용 안내
-                const notice = document.createElement('div');
-                notice.style.cssText = `
-                    background: #fff3cd;
-                    color: #856404;
-                    padding: 10px 15px;
-                    margin: 10px 0;
-                    border-radius: 8px;
-                    border: 1px solid #ffeaa7;
-                    font-size: 14px;
-                `;
-                notice.innerHTML = `
-                    📢 <strong>알림:</strong> 현재 브라우저는 저장 위치 선택 기능을 지원하지 않습니다.<br>
-                    썸네일은 기본 다운로드 폴더에 저장됩니다. 
-                    <strong>Chrome 86+</strong> 또는 <strong>Edge 86+</strong>에서 폴더 선택 기능을 사용할 수 있습니다.
-                `;
-                
-                const container = document.querySelector('.container');
-                container.insertBefore(notice, container.firstChild);
+            // 화질에 따른 다운로드 안내 메시지 생성
+            let qualityText = '';
+            let downloadTips = '';
+            
+            switch(quality) {
+                case '4K':
+                    qualityText = '4K (2160p) 최고 화질';
+                    downloadTips = '최고 화질로 크기가 매우 클 수 있습니다. Wi-Fi 환경에서 다운로드를 추천합니다.';
+                    break;
+                case '1080p':
+                    qualityText = 'Full HD (1080p) 고화질';
+                    downloadTips = '가장 인기 있는 화질로 화질과 파일 크기의 바란스가 좋습니다.';
+                    break;
+                case '720p':
+                    qualityText = 'HD (720p) 중간 화질';
+                    downloadTips = '빠른 다운로드가 가능하며 대부분의 기기에서 원활하게 재생됩니다.';
+                    break;
+                case '480p':
+                    qualityText = 'SD (480p) 기본 화질';
+                    downloadTips = '작은 파일 크기로 데이터 절약이 가능합니다.';
+                    break;
+                case '360p':
+                    qualityText = 'Low (360p) 낮은 화질';
+                    downloadTips = '배경 재생이나 음성 위주의 콘텐츠에 적합합니다.';
+                    break;
+                case 'audio':
+                    qualityText = '오디오만 (MP3/M4A)';
+                    downloadTips = '음악, 팟컬스트, 강의 등 음성만 필요한 경우에 적합합니다.';
+                    break;
             }
+            
+            const message = `선택한 화질: ${qualityText}\n\n` +
+                `동영상: ${currentVideoTitle}\n\n` +
+                `팁: ${downloadTips}\n\n` +
+                `추천 다운로더:\n` +
+                `1. yt-dlp (GitHub) - 최고 성능\n` +
+                `2. 4K Video Downloader - 간편한 UI\n` +
+                `3. ClipGrab - 사용 쉬움\n\n` +
+                `온라인 서비스:\n` +
+                `- savefrom.net\n` +
+                `- y2mate.com\n` +
+                `- keepvid.com\n\n` +
+                `주의: 저작권 법률을 준수하여 개인 용도로만 사용하세요.`;
+            
+            alert(message);
+            
+            // URL 자동 복사
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(currentVideoUrl).then(() => {
+                    console.log('동영상 URL이 클립보드에 복사되었습니다.');
+                }).catch(err => {
+                    console.log('URL 복사 실패:', err);
+                });
+            }
+            
+            // 동영상 페이지를 새 탭에서 열기
+            window.open(currentVideoUrl, '_blank');
+            
+            // 모달 닫기
+            closeQualityModal();
+        }
+        
+        // 모달 닫기 함수
+        function closeQualityModal() {
+            document.getElementById('qualityModal').style.display = 'none';
+            currentVideoUrl = '';
+            currentVideoTitle = '';
+            selectedQuality = '';
+        }
+        
+        // URL 복사 후 모달 닫기
+        function copyVideoUrl() {
+            if (currentVideoUrl) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(currentVideoUrl).then(() => {
+                        alert('동영상 URL이 클립보드에 복사되었습니다!');
+                        closeQualityModal();
+                    }).catch(err => {
+                        alert('URL 복사에 실패했습니다.');
+                        console.log('URL 복사 실패:', err);
+                    });
+                } else {
+                    // 클립보드 API를 지원하지 않는 경우
+                    alert(`URL을 수동으로 복사하세요:\n\n${currentVideoUrl}`);
+                    closeQualityModal();
+                }
+            }
+        }
+        
+
+
+
+        // 동영상 링크 클릭 시 URL 복사 + 새 탭 열기 함수
+        function openVideoWithCopy(videoUrl) {
+            try {
+                // 1. 클립보드에 URL 복사
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(videoUrl).then(() => {
+                        console.log('✅ URL이 클립보드에 복사되었습니다:', videoUrl);
+                        
+                        // 복사 성공을 시각적으로 표시 (선택적)
+                        showCopyNotification('URL이 클립보드에 복사되었습니다!');
+                    }).catch(err => {
+                        console.warn('URL 복사 실패:', err);
+                        // 복사 실패 시에도 링크는 열기
+                        showCopyNotification('링크를 열었습니다 (URL 복사는 실패)', 'warning');
+                    });
+                } else {
+                    // 클립보드 API를 지원하지 않는 경우
+                    console.warn('클립보드 API 미지원 - URL 복사 건너뛰기');
+                    showCopyNotification('링크를 열었습니다 (브라우저가 자동복사 미지원)', 'info');
+                }
+                
+                // 2. 새 탭에서 YouTube 페이지 열기
+                window.open(videoUrl, '_blank');
+                
+            } catch (error) {
+                console.error('링크 처리 오류:', error);
+                // 오류 발생 시에도 최소한 링크는 열기
+                window.open(videoUrl, '_blank');
+            }
+        }
+        
+        // URL 복사 알림 표시 함수
+        function showCopyNotification(message, type = 'success') {
+            // 기존 알림이 있으면 제거
+            const existingNotification = document.getElementById('copyNotification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            // 새 알림 생성
+            const notification = document.createElement('div');
+            notification.id = 'copyNotification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-weight: 500;
+                font-size: 14px;
+                max-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                transform: translateX(100%);
+                transition: transform 0.3s ease-in-out;
+                cursor: pointer;
+            `;
+            
+            // 타입별 스타일 설정
+            if (type === 'success') {
+                notification.style.backgroundColor = '#d4edda';
+                notification.style.color = '#155724';
+                notification.style.border = '1px solid #c3e6cb';
+                notification.innerHTML = `✅ ${message}`;
+            } else if (type === 'warning') {
+                notification.style.backgroundColor = '#fff3cd';
+                notification.style.color = '#856404';
+                notification.style.border = '1px solid #ffeaa7';
+                notification.innerHTML = `⚠️ ${message}`;
+            } else if (type === 'info') {
+                notification.style.backgroundColor = '#e3f2fd';
+                notification.style.color = '#0277bd';
+                notification.style.border = '1px solid #81d4fa';
+                notification.innerHTML = `ℹ️ ${message}`;
+            }
+            
+            // 페이지에 추가
+            document.body.appendChild(notification);
+            
+            // 애니메이션으로 표시
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // 클릭 시 즉시 제거
+            notification.addEventListener('click', () => {
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            });
+            
+            // 3초 후 자동 제거
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 3000);
         }
 
         // 검색 범위 드롭다운 기능
@@ -2483,26 +2961,9 @@
             console.log('YouTube 채널 검색 시스템이 준비되었습니다.');
             checkDownloadSupport();
             showDownloadInfo();
-            
-            // 카테고리 체크박스 이벤트 리스너 추가
-            document.getElementById('selectAllCategories').addEventListener('change', (e) => {
-                const isChecked = e.target.checked;
-                const categoryCheckboxes = document.querySelectorAll('input[name="categories"]');
-                
-                categoryCheckboxes.forEach(checkbox => {
-                    checkbox.checked = isChecked;
-                });
-                
-                updateCategoryDisplay();
-            });
-            
-            document.querySelectorAll('input[name="categories"]').forEach(checkbox => {
-                checkbox.addEventListener('change', () => {
-                    updateSelectAllCategories();
-                    updateCategoryDisplay();
-                });
-            });
         });
     </script>
+    
+
 </body>
 </html>
