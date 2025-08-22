@@ -31,19 +31,19 @@ async function checkESConnection() {
   }
 }
 
-// 다중 API 키 관리 시스템
+// 병렬 처리용 API 키 관리 시스템
 class ApiKeyManager {
   constructor() {
     // 환경변수에서 여러 API 키 수집
     this.apiKeys = [];
-    this.currentKeyIndex = 0;
+    this.currentKeyIndex = 0; // 라운드 로빈용 인덱스
     this.keyUsageCount = {};
     this.keyQuotaExceeded = {};
     this.statusFile = path.join(__dirname, 'api_key_status.json');
     
     // API 키들을 환경변수에서 수집
     const maxKeys = parseInt(process.env.MAX_API_KEYS) || 10;
-    console.log(`🔑 최대 API 키 개수: ${maxKeys}개`);
+    console.log(`🔑 최대 API 키 개수: ${maxKeys}개 (병렬 처리 모드)`);
     
     for (let i = 1; i <= maxKeys; i++) {
       const key = process.env[`YOUTUBE_API_KEY_${i}`] || (i === 1 ? process.env.YOUTUBE_API_KEY : null);
@@ -71,7 +71,7 @@ class ApiKeyManager {
       process.exit(1);
     }
     
-    console.log(`✅ ${this.apiKeys.length}개의 YouTube API 키가 설정되었습니다.`);
+    console.log(`✅ ${this.apiKeys.length}개의 YouTube API 키가 병렬 처리용으로 설정되었습니다.`);
     this.apiKeys.forEach((keyInfo, index) => {
       console.log(`   ${index + 1}. ${keyInfo.name} (***${keyInfo.key.slice(-4)})`);
     });
@@ -80,32 +80,31 @@ class ApiKeyManager {
     this.loadKeyStatus();
   }
   
-  // 현재 사용 가능한 API 키 반환 - 개선된 로직
-  getCurrentKey() {
-    // 할당량 초과되지 않은 키 찾기 (연속 오류가 많지 않은 키 우선)
-    let availableKeys = this.apiKeys.filter(keyInfo => 
+  // 라운드 로빈 방식으로 다음 키 선택
+  getNextKeyRoundRobin() {
+    const availableKeys = this.apiKeys.filter(keyInfo => 
       !keyInfo.quotaExceeded && keyInfo.consecutiveErrors < 3
     );
     
-    // 사용 가능한 키가 없으면 연속 오류 조건을 완화
     if (availableKeys.length === 0) {
-      availableKeys = this.apiKeys.filter(keyInfo => !keyInfo.quotaExceeded);
-    }
-    
-    if (availableKeys.length === 0) {
-      console.log('⚠️ 모든 API 키의 할당량이 초과되었습니다. 다음 날까지 대기해야 합니다.');
+      console.log('⚠️ 모든 API 키의 할당량이 초과되었습니다.');
       return null;
     }
     
-    // 사용 횟수가 가장 적은 키를 선택
-    availableKeys.sort((a, b) => a.usageCount - b.usageCount);
-    const selectedKey = availableKeys[0];
+    // 라운드 로빈: 사용 가능한 키들 중에서 순차적으로 선택
+    const keyIndex = this.currentKeyIndex % availableKeys.length;
+    const selectedKey = availableKeys[keyIndex];
     
-    // 현재 인덱스 업데이트
-    this.currentKeyIndex = selectedKey.index - 1;
-    console.log(`🔑 선택된 API 키: ${selectedKey.name} (사용횟수: ${selectedKey.usageCount}, 연속오류: ${selectedKey.consecutiveErrors})`);
+    // 다음 키로 인덱스 이동
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % availableKeys.length;
     
+    console.log(`🔄 라운드 로빈 선택: ${selectedKey.name} (인덱스: ${keyIndex}/${availableKeys.length})`);
     return selectedKey;
+  }
+  
+  // 현재 사용 가능한 API 키 반환 (기존 호환성 유지)
+  getCurrentKey() {
+    return this.getNextKeyRoundRobin();
   }
   
   // 현재 YouTube API 인스턴스 반환
@@ -118,7 +117,7 @@ class ApiKeyManager {
     currentKey.usageCount++;
     currentKey.lastUsed = new Date();
     
-    console.log(`🔑 사용 중인 API 키: ${currentKey.name} (사용횟수: ${currentKey.usageCount})`);
+    console.log(`🔑 병렬 처리용 키 사용: ${currentKey.name} (사용횟수: ${currentKey.usageCount})`);
     
     // 사용량 변경 저장 (주기적으로)
     if (currentKey.usageCount % 5 === 0) {
@@ -1015,15 +1014,20 @@ app.get('/api/search', rateLimitMiddleware, async (req, res) => {
         throw new Error('MAX_RETRIES_EXCEEDED: 비디오 상세정보 조회 실패');
       }
 
-             // 검색 결과 처리 (중복 제거)
+             // 검색 결과 처리 (중복 제거) - 디버깅 로그 추가
+       console.log(`📋 비디오 상세정보 처리 시작: ${videoDetails.data.items.length}개 동영상`);
+       
        for (const video of videoDetails.data.items) {
+         console.log(`\n🎬 처리 중: ${video.snippet.title.substring(0, 50)}...`);
+         
          // 중복 비디오 ID 체크
          if (processedVideoIds.has(video.id)) {
-           console.log(`🔄 중복 동영상 건너뛰기: ${video.id} - ${video.snippet.title}`);
+           console.log(`  ❌ 중복 동영상 건너뛰기: ${video.id}`);
            continue;
          }
          
          const viewCount = parseInt(video.statistics.viewCount || 0);
+         console.log(`  📊 조회수: ${viewCount.toLocaleString()}`);
          
          // 카테고리 필터링 (안전한 처리)
          let selectedCategories = [];
@@ -1036,22 +1040,34 @@ app.get('/api/search', rateLimitMiddleware, async (req, res) => {
          }
          
          if (selectedCategories.length > 0 && !selectedCategories.includes(video.snippet.categoryId)) {
-           console.log(`카테고리 필터링: ${video.snippet.categoryId} 제외`);
+           console.log(`  ❌ 카테고리 필터링: ${video.snippet.categoryId} 제외 (선택: ${selectedCategories.join(',')})`);
            continue;
          }
          
          // 조회수 필터링
-         if (minViews && viewCount < parseInt(minViews)) continue;
-         if (maxViews && viewCount > parseInt(maxViews)) continue;
+         if (minViews && viewCount < parseInt(minViews)) {
+           console.log(`  ❌ 최소 조회수 미달: ${viewCount.toLocaleString()} < ${parseInt(minViews).toLocaleString()}`);
+           continue;
+         }
+         if (maxViews && viewCount > parseInt(maxViews)) {
+           console.log(`  ❌ 최대 조회수 초과: ${viewCount.toLocaleString()} > ${parseInt(maxViews).toLocaleString()}`);
+           continue;
+         }
 
          // 동영상 길이 필터링
          const durationInSeconds = parseDuration(video.contentDetails.duration);
          const videoLengthCategory = getVideoLengthCategory(durationInSeconds);
+         console.log(`  ⏱️ 동영상 길이: ${durationInSeconds}초 (${videoLengthCategory})`);
          
-         if (!matchesVideoLength(videoLengthCategory, selectedVideoLengths)) continue;
+         if (!matchesVideoLength(videoLengthCategory, selectedVideoLengths)) {
+           console.log(`  ❌ 동영상 길이 필터링: ${videoLengthCategory} 제외 (선택: ${selectedVideoLengths.join(',') || '모든 길이'})`);
+           continue;
+         }
 
-                 // 채널 구독자 수 정보 가져오기
+        // 채널 구독자 수 정보 가져오기
+        console.log(`  📡 채널 구독자 수 조회 중: ${video.snippet.channelId}`);
         const subscriberCount = await getChannelSubscriberCount(video.snippet.channelId);
+        console.log(`  👥 구독자 수: ${subscriberCount.toLocaleString()}`);
 
         const result = {
           youtube_channel_name: video.snippet.channelTitle,
@@ -1078,8 +1094,12 @@ app.get('/api/search', rateLimitMiddleware, async (req, res) => {
          // 중복 제거 후 결과 추가
          searchResults.push(result);
          processedVideoIds.add(video.id); // 처리된 ID 기록
+         console.log(`  ✅ 결과 추가 완료: ${searchResults.length}번째`);
          
-         if (searchResults.length >= finalMaxResults) break;
+         if (searchResults.length >= finalMaxResults) {
+           console.log(`  🎯 요청된 결과 수 달성: ${finalMaxResults}개`);
+           break;
+         }
        }
 
       nextPageToken = response.data.nextPageToken;
